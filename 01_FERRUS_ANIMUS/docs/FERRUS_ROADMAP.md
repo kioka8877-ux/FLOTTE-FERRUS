@@ -51,9 +51,11 @@
 - [x] Rapport de sortie (bones_lisses, keyframes_modifies, kernel_size)
 
 ### 2.2 stabilize_hips.py
-- [ ] Detection derive verticale hips_JNT
-- [ ] Correction par offset progressif
-- [ ] Parametre correction_verticale_cm
+- [x] Detection derive verticale hips_JNT (moindres carres, tendance lineaire)
+- [x] Correction par detrending lineaire (offset progressif, premier frame preserve)
+- [x] Parametre correction_verticale_cm
+- [x] Mode skip si stable ou FCurve absente
+- [x] Rapport de sortie (direction, delta_detecte_cm, keyframes_corriges)
 
 ### 2.3 remove_foot_slide.py
 - [ ] Detection frames ou pied au sol (Y < seuil)
