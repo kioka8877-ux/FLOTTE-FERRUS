@@ -33,10 +33,10 @@
 - [x] Fallback si ANTHROPIC_API_KEY absent
 
 ### 1.3 Merge INTEL
-- [ ] Fonction merge_intel() : intel_vision + intel_skeleton → plan_corrections.json
-- [ ] Logique d'activation conditionnelle des corrections EXEC
-- [ ] Injection membres_hors_cadre → mask_limbs
-- [ ] Injection jitter_bones → smooth_fcurves.bones_cibles
+- [x] Fonction merge_intel() : intel_vision + intel_skeleton → plan_corrections.json
+- [x] Logique d'activation conditionnelle des corrections EXEC
+- [x] Injection membres_hors_cadre → mask_limbs
+- [x] Injection jitter_bones → smooth_fcurves.bones_cibles
 
 ---
 
@@ -58,44 +58,45 @@
 - [x] Rapport de sortie (direction, delta_detecte_cm, keyframes_corriges)
 
 ### 2.3 remove_foot_slide.py
-- [ ] Detection frames ou pied au sol (Y < seuil)
-- [ ] Blocage position pied sur ces frames
-- [ ] Parametres : pied_gauche, pied_droit, seuil_cm
+- [x] Detection frames ou pied au sol (Y < seuil)
+- [x] Blocage position pied sur ces frames
+- [x] Parametres : pied_gauche, pied_droit, seuil_cm
 
 ### 2.4 camera_follow.py
-- [ ] Creation camera Blender
-- [ ] Suivi de la cible (lock / smooth_follow / static)
-- [ ] Export camera dans FBX de sortie
+- [x] Creation camera Blender
+- [x] Suivi de la cible (lock / smooth_follow / static)
+- [x] Export camera dans FBX de sortie
 
 ### 2.5 mask_limbs.py
-- [ ] Lecture membres_a_masquer
-- [ ] Neutralisation des FCurves des membres hors cadre
-- [ ] Zero-out rotation + scale sur bones cibles
+- [x] Lecture membres_a_masquer
+- [x] Neutralisation des FCurves des membres hors cadre
+- [x] Zero-out rotation + scale sur bones cibles
 
 ---
 
 ## PHASE 3 — COMPARTIMENT OUTPUT
 
 ### 3.1 retarget_r15.py
-- [ ] Construction du rig R15 programmatique (15 bones, zero GLB)
-- [ ] Hierarchie R15 : LowerTorso (root) → UpperTorso → Head / Bras / Jambes
-- [ ] Transfert des rotations DeepMotion → R15 (quaternion force)
-- [ ] Application root_position sur LowerTorso
-- [ ] Bones ignores : doigts, shoulder, toebase, neck
-- [ ] Export FBX R15 final
+- [x] Construction du rig R15 programmatique (15 bones, zero GLB)
+- [x] Hierarchie R15 : LowerTorso (root) → UpperTorso → Head / Bras / Jambes
+- [x] Transfert des rotations DeepMotion → R15 (quaternion force)
+- [x] Application root_position sur LowerTorso
+- [x] Bones ignores : doigts, shoulder, toebase, neck
+- [x] Export FBX R15 final
 
 ---
 
 ## PHASE 4 — NOTEBOOK COLAB D'ASSEMBLAGE
 
-- [ ] main_ferrus.ipynb : notebook principal
-- [ ] Cellule SETUP : montage Drive, installation Blender, venv
-- [ ] Cellule INTEL : pre-parse FBX + analyse Claude + injection JSON Gemini
-- [ ] Cellule EXEC : execution des 5 operations (ordre : smooth → hips → foot → mask → camera)
-- [ ] Cellule OUTPUT : retargeting R15
-- [ ] Cellule RAPPORT : generation rapport.json + affichage resume
-- [ ] Widget injection JSON Gemini (sans API key)
-- [ ] Gestion multi-personnes (scan IN/, manifest.json, traitement sequentiel)
+- [x] main_ferrus.ipynb : notebook principal
+- [x] Cellule SETUP : montage Drive, installation Blender, helpers
+- [x] Cellule INTEL : pre-parse FBX via Blender + analyse Claude API + fallback statique
+- [x] Cellule MERGE : merge_intel() → plan_corrections.json
+- [x] Cellule EXEC : execution des 5 operations (ordre : smooth → hips → foot → mask → camera)
+- [x] Cellule OUTPUT : retargeting R15
+- [x] Cellule RAPPORT : generation rapport.json + affichage resume
+- [x] Widget injection JSON Gemini (sans API key, via fichier ou variable)
+- [x] Gestion multi-personnes (scan IN/, manifest.json, traitement sequentiel)
 
 ---
 
