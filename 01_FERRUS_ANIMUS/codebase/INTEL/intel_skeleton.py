@@ -1,21 +1,26 @@
 """
 intel_skeleton.py — FERRUS ANIMUS / Compartiment INTEL
-Analyse les fichiers FBX DeepMotion via l'API Claude (claude-sonnet-4-6)
+Analyse les fichiers FBX DeepMotion via le AI Gateway (OpenAI-compatible)
 et produit les contrats intel_skeleton_{stem}.json.
 
 Appele depuis le notebook Colab (cellule INTEL) apres pre_parse_fbx.py.
 
+Variable d'environnement requise : AI_GATEWAY_API_KEY (Secrets Colab)
+
 Voir : FERRUS_INTEL_SKELETON_CLAUDE_METAPROMPT.md pour le detail du prompt.
 """
 
-import anthropic
+import requests
 import json
 import os
 
 from pre_parse_fbx import extract_fbx_metadata
 
 
-# ══ Configuration Claude ══════════════════════════════════════════════════════
+# ══ Configuration AI Gateway ══════════════════════════════════════════════════
+
+AI_GATEWAY_URL = "https://ai-gateway.happycapy.ai/api/v1/chat/completions"
+AI_GATEWAY_MODEL = "anthropic/claude-sonnet-4-6"
 
 SYSTEM_PROMPT = (
     "Tu es un validateur de pipeline d'animation 3D specialise dans les fichiers FBX DeepMotion. "
@@ -130,35 +135,38 @@ IMPORTANT :
 
 # ══ Fonctions principales ═════════════════════════════════════════════════════
 
-def analyze_fbx_with_claude(fbx_path: str, fbx_xml: str, api_key: str) -> dict:
+def analyze_fbx_with_gateway(fbx_path: str, fbx_xml: str, api_key: str) -> dict:
     """
-    Envoie les metadonnees FBX a Claude et retourne l'analyse structuree.
+    Envoie les metadonnees FBX au AI Gateway et retourne l'analyse structuree.
 
     Args:
         fbx_path: chemin vers le fichier FBX (pour le nom de fichier)
         fbx_xml:  metadonnees pre-parsees par bpy (sortie de extract_fbx_metadata)
-        api_key:  cle API Anthropic
+        api_key:  cle AI Gateway (AI_GATEWAY_API_KEY)
 
     Returns:
         dict conforme au contrat INTEL-SKELETON
     """
-    client = anthropic.Anthropic(api_key=api_key)
     user_message = USER_PROMPT_TEMPLATE.format(fbx_xml=fbx_xml)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        thinking={"type": "adaptive"},
-        messages=[{"role": "user", "content": user_message}],
-    )
+    payload = {
+        "model": AI_GATEWAY_MODEL,
+        "max_tokens": 4096,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+    }
 
-    # Extraire le texte de la reponse
-    response_text = ""
-    for block in response.content:
-        if block.type == "text":
-            response_text = block.text.strip()
-            break
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.post(AI_GATEWAY_URL, json=payload, headers=headers, timeout=60)
+    response.raise_for_status()
+
+    response_text = response.json()["choices"][0]["message"]["content"].strip()
 
     # Nettoyer les backticks eventuels (fallback)
     if response_text.startswith("```"):
@@ -281,7 +289,7 @@ def run_intel_skeleton(
     Args:
         fbx_files:  liste des chemins vers les fichiers FBX dans IN/
         output_dir: dossier ou sauvegarder les JSON d'analyse
-        api_key:    cle API Anthropic (None = fallback statique)
+        api_key:    cle AI Gateway — AI_GATEWAY_API_KEY (None = fallback statique)
 
     Returns:
         liste des analyses, une par FBX
@@ -304,11 +312,11 @@ def run_intel_skeleton(
         # Pre-parsing bpy
         fbx_xml = extract_fbx_metadata(fbx_path)
 
-        # Appel Claude ou fallback statique
+        # Appel AI Gateway ou fallback statique
         if api_key:
-            analysis = analyze_fbx_with_claude(fbx_path, fbx_xml, api_key)
+            analysis = analyze_fbx_with_gateway(fbx_path, fbx_xml, api_key)
         else:
-            print(f"  [INTEL-SKELETON] ANTHROPIC_API_KEY absent — fallback statique")
+            print(f"  [INTEL-SKELETON] AI_GATEWAY_API_KEY absent — fallback statique")
             analysis = _static_fallback(fbx_path, fbx_xml)
 
         # Sauvegarde cache
