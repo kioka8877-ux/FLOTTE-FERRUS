@@ -20,8 +20,11 @@
 - COMPARTIMENT EXEC : 5/5 operations TERMINEES
 - OUTPUT livree : retarget_r15.py — rig R15 programmatique, matrix_basis quaternion, export selection
 - PIPELINE livre : main_ferrus.ipynb — 10 cellules, orchestration complete INTEL→EXEC→OUTPUT→RAPPORT
+- Validation en production demarree (session 2026-04-17) — SETUP + CONFIG + SCAN + INTEL OK
+- Dossiers GEMINI_IN/ et CLAUDE_IN/ crees pour depot persistant des JSON IA sur Drive
+- Notebook patche : cellule SETUP definit GEMINI_IN/CLAUDE_IN, cellule INTEL check CLAUDE_IN avant fallback, cellule GEMINI cherche dans GEMINI_IN en priorite
 
-[NEXT_TASK] : VALIDATION IMPERIALE — test bout en bout sur FBX de reference
+[NEXT_TASK] : VALIDATION IMPERIALE — continuer test bout en bout (cellules MERGE → EXEC → OUTPUT → RAPPORT)
 
 [STATUS] : PRET_POUR_VALIDATION — tous les modules implementes, test en production autorise
 
