@@ -4,7 +4,8 @@ Retargeting du squelette DeepMotion (52 bones) vers Roblox R15 (15 bones).
 
 Consomme : plan_corrections.json -> retargeting_r15
   {
-    "enabled": true
+    "enabled": true,
+    "t_pose_disponible": true
   }
 
 Principe :
@@ -260,7 +261,10 @@ def _load_retarget_params(plan_path: str) -> dict | None:
     if retarget.get("enabled", True) is False:
         return None
 
-    return {"enabled": True}
+    return {
+        "enabled":          True,
+        "t_pose_disponible": retarget.get("t_pose_disponible", True),
+    }
 
 
 # ══ Fonction principale ═══════════════════════════════════════════════════════
@@ -288,7 +292,13 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
         shutil.copy2(fbx_in, fbx_out)
         return {"status": "skipped", "raison": "enabled=false"}
 
+    t_pose = params["t_pose_disponible"]
+
     print("[retarget_r15] Demarrage du retargeting DeepMotion → Roblox R15")
+    if not t_pose:
+        print("[retarget_r15] AVERTISSEMENT : t_pose_incluse=false")
+        print("[retarget_r15] La pose repos sera extraite du bind pose DeepMotion (non calibre T-pose)")
+        print("[retarget_r15] Risque de legere derive d'orientation sur certains bones R15")
 
     # Charger le FBX corrige
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -377,6 +387,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
         "bones_manquants":    bones_manquants,
         "frames_transferees": frames_done,
         "r15_bones":          list(R15_HIERARCHY.keys()),
+        "t_pose_disponible":  t_pose,
         "fbx_out":            fbx_out,
     }
 
