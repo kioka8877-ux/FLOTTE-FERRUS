@@ -1,6 +1,6 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17 (session EXEC Op.4 livree)
+# Derniere mise a jour : 2026-04-17 (session EXEC Op.5 livree — compartiment EXEC COMPLET)
 
 ---
 
@@ -16,8 +16,10 @@
 - Session architecture INTEL : modes Chat valides, contrats JSON confirmes
 - EXEC Op.3 livree : remove_foot_slide.py — detection phases contact + gel X/Z (zero numpy)
 - EXEC Op.4 livree : camera_follow.py — 3 modes (static/lock/smooth_follow), rotation via to_track_quat
+- EXEC Op.5 livree : mask_limbs.py — neutralisation rotations bones hors cadre (quaternion + euler)
+- COMPARTIMENT EXEC : 5/5 operations TERMINEES
 
-[NEXT_TASK] : Developpement EXEC — mask_limbs.py (Operation 5)
+[NEXT_TASK] : Developpement OUTPUT — retarget_r15.py
 
 [BLOCKERS] : Aucun
 
@@ -42,7 +44,7 @@
 | EXEC | stabilize_hips.py | TERMINE |
 | EXEC | remove_foot_slide.py | TERMINE |
 | EXEC | camera_follow.py | TERMINE |
-| EXEC | mask_limbs.py | EN ATTENTE |
+| EXEC | mask_limbs.py | TERMINE |
 | OUTPUT | retarget_r15.py | EN ATTENTE |
 | PIPELINE | main_ferrus.ipynb | EN ATTENTE |
 
