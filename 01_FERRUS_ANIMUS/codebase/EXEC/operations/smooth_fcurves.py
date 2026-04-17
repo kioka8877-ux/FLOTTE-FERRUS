@@ -24,6 +24,7 @@ import sys
 import os
 import json
 import argparse
+import math
 from math import exp
 
 
@@ -58,6 +59,32 @@ def _intensite_to_kernel(intensite: float):
     return params[idx]
 
 
+# ══ Euler unwrapping ══════════════════════════════════════════════════════════
+
+def _unwrap_euler(values: list) -> list:
+    """
+    Corrige les discontinuites 2π dans une sequence d'angles Euler.
+    Chaque saut > π est compense par ±2π pour rendre la sequence continue.
+    Prerequis au lissage gaussien quand gimbal_lock_risque=True.
+    """
+    if len(values) < 2:
+        return list(values)
+
+    TWO_PI   = 2.0 * math.pi
+    unwrapped = [values[0]]
+
+    for i in range(1, len(values)):
+        diff = values[i] - unwrapped[-1]
+        # Ramener diff dans [-π, π]
+        while diff >  math.pi:
+            diff -= TWO_PI
+        while diff < -math.pi:
+            diff += TWO_PI
+        unwrapped.append(unwrapped[-1] + diff)
+
+    return unwrapped
+
+
 # ══ Lissage FCurve ════════════════════════════════════════════════════════════
 
 def _smooth_values(values: list, kernel: list) -> list:
@@ -84,9 +111,12 @@ def _smooth_values(values: list, kernel: list) -> list:
     return result
 
 
-def _smooth_fcurve(fc, kernel: list) -> int:
+def _smooth_fcurve(fc, kernel: list, unwrap: bool = False) -> int:
     """
     Lisse les valeurs d'une FCurve avec le noyau fourni.
+    Si unwrap=True et que la FCurve est de type rotation_euler,
+    applique un Euler unwrapping avant le lissage pour eviter
+    les artefacts de gimbal lock.
     Retourne le nombre de keyframes modifies.
     """
     kps = fc.keyframe_points
@@ -94,6 +124,11 @@ def _smooth_fcurve(fc, kernel: list) -> int:
         return 0
 
     values = [kp.co[1] for kp in kps]
+
+    # Euler unwrapping sur les courbes de rotation uniquement
+    if unwrap and 'rotation_euler' in fc.data_path:
+        values = _unwrap_euler(values)
+
     smoothed = _smooth_values(values, kernel)
 
     for kp, new_val in zip(kps, smoothed):
@@ -108,9 +143,11 @@ def _smooth_fcurve(fc, kernel: list) -> int:
 
 # ══ Application sur l'armature ════════════════════════════════════════════════
 
-def _apply_smoothing(armature, bones_cibles: list, kernel: list) -> dict:
+def _apply_smoothing(armature, bones_cibles: list, kernel: list, unwrap: bool = False) -> dict:
     """
     Applique le lissage gaussien sur toutes les FCurves des bones cibles.
+    Si unwrap=True, applique un Euler unwrapping avant lissage sur les
+    courbes rotation_euler pour corriger les artefacts de gimbal lock.
 
     Returns:
         dict avec les stats par bone : {bone_name: nb_keyframes_modifies}
@@ -132,7 +169,7 @@ def _apply_smoothing(armature, bones_cibles: list, kernel: list) -> dict:
         if bone_name not in bones_cibles:
             continue
 
-        nb = _smooth_fcurve(fc, kernel)
+        nb = _smooth_fcurve(fc, kernel, unwrap=unwrap)
         if nb > 0:
             stats[bone_name] = stats.get(bone_name, 0) + nb
 
@@ -154,14 +191,15 @@ def _load_smooth_params(plan_path: str) -> dict | None:
     if not smooth.get("enabled", False):
         return None
 
-    bones = smooth.get("bones_cibles", [])
+    bones   = smooth.get("bones_cibles", [])
     intensite = float(smooth.get("intensite", 0.5))
+    gimbal  = bool(smooth.get("gimbal_lock_risque", False))
 
     if not bones:
         print("[smooth_fcurves] Avertissement : bones_cibles vide — aucun lissage applique")
         return None
 
-    return {"bones_cibles": bones, "intensite": intensite}
+    return {"bones_cibles": bones, "intensite": intensite, "gimbal_lock_risque": gimbal}
 
 
 # ══ Fonction principale ═══════════════════════════════════════════════════════
@@ -190,10 +228,11 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
 
     bones_cibles = params["bones_cibles"]
     intensite    = params["intensite"]
+    gimbal       = params["gimbal_lock_risque"]
     kernel_size, sigma = _intensite_to_kernel(intensite)
     kernel = _gaussian_kernel(kernel_size, sigma)
 
-    print(f"[smooth_fcurves] Parametres : intensite={intensite} | kernel={kernel_size} | sigma={sigma}")
+    print(f"[smooth_fcurves] Parametres : intensite={intensite} | kernel={kernel_size} | sigma={sigma} | euler_unwrap={gimbal}")
     print(f"[smooth_fcurves] Bones cibles ({len(bones_cibles)}) : {', '.join(bones_cibles)}")
 
     # Charger le FBX
@@ -204,8 +243,8 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
     if not armature:
         raise RuntimeError(f"[smooth_fcurves] Aucune armature dans {fbx_in}")
 
-    # Appliquer le lissage
-    stats = _apply_smoothing(armature, bones_cibles, kernel)
+    # Appliquer le lissage (avec unwrapping si gimbal_lock_risque)
+    stats = _apply_smoothing(armature, bones_cibles, kernel, unwrap=gimbal)
 
     total_kf = sum(stats.values())
     print(f"[smooth_fcurves] Lissage applique sur {len(stats)} bones | {total_kf} keyframes modifies")
@@ -233,6 +272,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
         "kernel_size": kernel_size,
         "sigma": sigma,
         "intensite": intensite,
+        "euler_unwrap_applique": gimbal,
         "fbx_out": fbx_out,
     }
 
