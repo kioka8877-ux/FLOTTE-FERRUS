@@ -1,6 +1,6 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17 (session PIPELINE livree — main_ferrus.ipynb TERMINE)
+# Derniere mise a jour : 2026-04-17 (PIPELINE COMPLET — main_ferrus.ipynb TERMINE)
 
 ---
 
@@ -19,9 +19,11 @@
 - EXEC Op.5 livree : mask_limbs.py — neutralisation rotations bones hors cadre (quaternion + euler)
 - COMPARTIMENT EXEC : 5/5 operations TERMINEES
 - OUTPUT livree : retarget_r15.py — rig R15 programmatique, matrix_basis quaternion, export selection
-- PIPELINE livre : main_ferrus.ipynb — notebook Colab orchestrateur complet (10 cellules)
+- PIPELINE livre : main_ferrus.ipynb — 10 cellules, orchestration complete INTEL→EXEC→OUTPUT→RAPPORT
 
-[NEXT_TASK] : Test en production — FBX de reference (WhatsApp_Video_2026-04-12)
+[NEXT_TASK] : VALIDATION IMPERIALE — test bout en bout sur FBX de reference
+
+[STATUS] : PRET_POUR_VALIDATION — tous les modules implementes, test en production autorise
 
 [BLOCKERS] : Aucun
 
