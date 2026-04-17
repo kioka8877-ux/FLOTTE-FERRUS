@@ -1,6 +1,6 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17 (session EXEC Op.3 livree)
+# Derniere mise a jour : 2026-04-17 (session EXEC Op.4 livree)
 
 ---
 
@@ -15,8 +15,9 @@
 - Module INTEL developpe : pre_parse_fbx.py + intel_skeleton.py
 - Session architecture INTEL : modes Chat valides, contrats JSON confirmes
 - EXEC Op.3 livree : remove_foot_slide.py — detection phases contact + gel X/Z (zero numpy)
+- EXEC Op.4 livree : camera_follow.py — 3 modes (static/lock/smooth_follow), rotation via to_track_quat
 
-[NEXT_TASK] : Developpement EXEC — camera_follow.py (Operation 4)
+[NEXT_TASK] : Developpement EXEC — mask_limbs.py (Operation 5)
 
 [BLOCKERS] : Aucun
 
@@ -40,7 +41,7 @@
 | EXEC | smooth_fcurves.py | TERMINE |
 | EXEC | stabilize_hips.py | TERMINE |
 | EXEC | remove_foot_slide.py | TERMINE |
-| EXEC | camera_follow.py | EN ATTENTE |
+| EXEC | camera_follow.py | TERMINE |
 | EXEC | mask_limbs.py | EN ATTENTE |
 | OUTPUT | retarget_r15.py | EN ATTENTE |
 | PIPELINE | main_ferrus.ipynb | EN ATTENTE |
