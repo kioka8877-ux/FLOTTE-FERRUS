@@ -1,6 +1,6 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17 (session architecture INTEL validee)
+# Derniere mise a jour : 2026-04-17 (session EXEC Op.3 livree)
 
 ---
 
@@ -14,8 +14,9 @@
 - Documents FERRUS (STATE, PRD, ROADMAP, VALIDATION) rediges
 - Module INTEL developpe : pre_parse_fbx.py + intel_skeleton.py
 - Session architecture INTEL : modes Chat valides, contrats JSON confirmes
+- EXEC Op.3 livree : remove_foot_slide.py — detection phases contact + gel X/Z (zero numpy)
 
-[NEXT_TASK] : Developpement EXEC — remove_foot_slide.py (Operation 3)
+[NEXT_TASK] : Developpement EXEC — camera_follow.py (Operation 4)
 
 [BLOCKERS] : Aucun
 
@@ -38,7 +39,7 @@
 | INTEL | prompts/correction_prompt.txt | PLACEHOLDER |
 | EXEC | smooth_fcurves.py | TERMINE |
 | EXEC | stabilize_hips.py | TERMINE |
-| EXEC | remove_foot_slide.py | EN ATTENTE |
+| EXEC | remove_foot_slide.py | TERMINE |
 | EXEC | camera_follow.py | EN ATTENTE |
 | EXEC | mask_limbs.py | EN ATTENTE |
 | OUTPUT | retarget_r15.py | EN ATTENTE |
