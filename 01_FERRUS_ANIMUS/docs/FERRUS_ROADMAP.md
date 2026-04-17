@@ -43,10 +43,12 @@
 ## PHASE 2 — COMPARTIMENT EXEC
 
 ### 2.1 smooth_fcurves.py
-- [ ] Lecture plan_corrections.json
-- [ ] Lissage FCurves sur bones_cibles (Gaussian smoothing bpy)
-- [ ] Parametre intensite (0.0 → 1.0)
-- [ ] Sauvegarde FBX intermediaire
+- [x] Lecture plan_corrections.json
+- [x] Lissage FCurves sur bones_cibles (Gaussian smoothing bpy)
+- [x] Parametre intensite (0.0 → 1.0) — kernel 3/5/7/9/11 + sigma adapte
+- [x] Sauvegarde FBX intermediaire
+- [x] Mode skip si enabled=false (copie directe)
+- [x] Rapport de sortie (bones_lisses, keyframes_modifies, kernel_size)
 
 ### 2.2 stabilize_hips.py
 - [ ] Detection derive verticale hips_JNT

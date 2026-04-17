@@ -15,7 +15,7 @@
 - Module INTEL developpe : pre_parse_fbx.py + intel_skeleton.py
 - Session architecture INTEL : modes Chat valides, contrats JSON confirmes
 
-[NEXT_TASK] : Developpement EXEC — smooth_fcurves.py (Operation 1)
+[NEXT_TASK] : Developpement EXEC — stabilize_hips.py (Operation 2)
 
 [BLOCKERS] : Aucun
 
@@ -36,7 +36,7 @@
 | INTEL | pre_parse_fbx.py | TERMINE |
 | INTEL | intel_skeleton.py | TERMINE |
 | INTEL | prompts/correction_prompt.txt | PLACEHOLDER |
-| EXEC | smooth_fcurves.py | EN COURS |
+| EXEC | smooth_fcurves.py | TERMINE |
 | EXEC | stabilize_hips.py | EN ATTENTE |
 | EXEC | remove_foot_slide.py | EN ATTENTE |
 | EXEC | camera_follow.py | EN ATTENTE |
