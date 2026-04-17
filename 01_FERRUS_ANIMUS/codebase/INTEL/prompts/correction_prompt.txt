@@ -1,0 +1,3 @@
+# FERRUS ANIMUS - Mega-Prompt INTEL (Gemini)
+# A COMPLETER lors de la Phase 3 (FERRUS_PRD.md)
+# Contrat : section 15.1 du Codex Mechanicus Tome I
