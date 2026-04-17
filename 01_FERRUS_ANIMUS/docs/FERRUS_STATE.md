@@ -1,6 +1,6 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17
+# Derniere mise a jour : 2026-04-17 (session architecture INTEL validee)
 
 ---
 
@@ -13,6 +13,7 @@
 - Depot GitHub kioka8877-ux/FLOTTE-FERRUS cree et structure
 - Documents FERRUS (STATE, PRD, ROADMAP, VALIDATION) rediges
 - Module INTEL developpe : pre_parse_fbx.py + intel_skeleton.py
+- Session architecture INTEL : modes Chat valides, contrats JSON confirmes
 
 [NEXT_TASK] : Developpement EXEC — smooth_fcurves.py (Operation 1)
 
@@ -52,3 +53,12 @@
 - INTEL double tete : Gemini (video) + Claude API (FBX) → merge → plan_corrections.json
 - Rotations en quaternion forces au retargeting (prevenir gimbal lock)
 - Cache JSON par fichier FBX (zero retokenisation si deja analyse)
+
+## Decisions Validees — Session 2026-04-17
+
+- MODE INTEL CHAT VALIDE : Gemini Chat + video.mp4 → intel_vision.json (copie manuelle Colab)
+- MODE INTEL CHAT VALIDE : Claude Chat + FBX brut (≤ 20 Mo) → intel_skeleton.json (copie manuelle Colab)
+- VERROU JSON = qualite du metaprompt (FORMAT EXACT ATTENDU + enums + champs requis)
+- Les deux metaprompts (INTEL-VISION + INTEL-SKELETON) constituent le double verrou JSON de la flotte
+- intel_skeleton.py reste valide pour le mode API (chemin alternatif automatise)
+- Deux modes d'entree pour Claude : FBX brut (chat) ou XML pre-parse (API via intel_skeleton.py) — meme contrat de sortie

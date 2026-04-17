@@ -169,7 +169,29 @@ Voir : Codex Mechanicus Tome I — Section XV.3
 
 ---
 
-## X. CONTRAINTES INVIOLABLES
+## X. DEUX MODES D'UTILISATION INTEL (valides simultanement)
+
+### Mode Chat (principal — zero API key)
+
+| MODELE | INPUT | OUTPUT | INJECTION |
+|---|---|---|---|
+| Gemini Chat | video.mp4 + FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md | intel_vision.json | Copie manuelle dans cellule Colab |
+| Claude Chat | FBX brut (≤ 20 Mo) + FERRUS_INTEL_SKELETON_CLAUDE_METAPROMPT.md | intel_skeleton.json | Copie manuelle dans cellule Colab |
+
+**Verrou JSON :** metaprompt (FORMAT EXACT ATTENDU + enums + champs requis)
+
+### Mode API (alternatif — automatise)
+
+| MODELE | MODULE | INPUT | OUTPUT |
+|---|---|---|---|
+| Claude API | intel_skeleton.py | XML pre-parse (pre_parse_fbx.py) | intel_skeleton.json (auto) |
+| Gemini API | (futur) | video.mp4 | intel_vision.json (auto) |
+
+Les deux modes produisent le **meme contrat JSON** — le pipeline EXEC ne fait pas la difference.
+
+---
+
+## XI. CONTRAINTES INVIOLABLES
 
 1. Aucun fichier GLB en input — rig R15 programme
 2. Blender en mode headless uniquement (-b) — zero interface
