@@ -49,9 +49,39 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 
 | FREGATE | NOM | STATUT |
 |---|---|---|
+| 00 | FERRUS FORGE | PLANIFICATION - Developpement autorise |
 | 01 | FERRUS ANIMUS | OPERATIONNELLE - Pipeline complet livre |
-| 02 | FERRUS CORPUS | PLANIFICATION - Developpement autorise |
+| 02 | FERRUS CORPUS | OPERATIONNELLE - Pipeline complet livre |
 | 03 | ??? (decret futur) | EN ATTENTE DE DECRET IMPERIAL |
+
+---
+
+## Fregate 00 - FERRUS FORGE
+
+**Mission :** Convertir tout avatar brut (`.glb`, `.obj`, `.fbx`) en fichier `.blend`
+propre et exploitable par FERRUS CORPUS.
+
+```
+avatar_P1.glb  ┐
+avatar_P2.obj  │  →  [FORGE]  →  avatar_P1.blend
+avatar_P3.fbx  ┘                  avatar_P2.blend
+                                   avatar_P3.blend
+                                         ↓
+                                  FERRUS CORPUS IN_AVATAR/
+```
+
+### Structure
+
+```
+00_FERRUS_FORGE/
+  codebase/
+    forge_convert.py   <- Script Blender headless (coeur)
+    forge_main.ipynb   <- Notebook Colab
+    docs/
+      FORGE_STATE.md / FORGE_PRD.md / FORGE_ROADMAP.md / FORGE_VALIDATION.md
+  IN/    <- Deposer les avatars bruts ici (.glb / .obj / .fbx)
+  OUT/   <- Recuperer les .blend ici
+```
 
 ---
 
