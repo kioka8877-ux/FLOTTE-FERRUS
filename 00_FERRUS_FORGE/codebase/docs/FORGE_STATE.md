@@ -4,7 +4,7 @@
 
 ---
 
-[STATUS] : PLANIFICATION — Phase 3 Bible Technique
+[STATUS] : PRET_POUR_VALIDATION — Phase 5 Developpement Divin TERMINE
 
 [LAST_WORK] :
 - Decret Imperial emis : Fregate 00 FERRUS FORGE creee
@@ -14,10 +14,12 @@
 - Structure dossiers creee sur GitHub
 - README.md redige et deploye
 - Fichiers docs/ initialises (STATE, PRD, ROADMAP, VALIDATION)
+- forge_convert.py livre : detection format, import GLB/OBJ/FBX, nettoyage, validation R15, export .blend, rapport JSON
+- forge_main.ipynb livre : 5 cellules (GIT SYNC, SETUP, CONFIG, CONVERSION, RAPPORT)
 
-[NEXT_TASK] : Developper forge_convert.py + forge_main.ipynb (Phase 5 Developpement Divin)
+[NEXT_TASK] : VALIDATION IMPERIALE — test bout en bout sur avatars reels (GLB, OBJ, FBX)
 
-[STATUS] : PRET_POUR_DEVELOPPEMENT — specs validees, architecture figee
+[STATUS] : PRET_POUR_VALIDATION — tous les modules implementes, test en production autorise
 
 [BLOCKERS] : Aucun
 
@@ -33,12 +35,12 @@
 
 | COMPARTIMENT | MODULE | STATUT |
 |---|---|---|
-| CORE | forge_convert.py | A DEVELOPPER |
-| PIPELINE | forge_main.ipynb | A DEVELOPPER |
-| DOCS | FORGE_STATE.md | INITIALISE |
+| CORE | forge_convert.py | TERMINE |
+| PIPELINE | forge_main.ipynb | TERMINE |
+| DOCS | FORGE_STATE.md | VALIDE |
 | DOCS | FORGE_PRD.md | VALIDE |
 | DOCS | FORGE_ROADMAP.md | VALIDE |
-| DOCS | FORGE_VALIDATION.md | INITIALISE |
+| DOCS | FORGE_VALIDATION.md | EN ATTENTE DE TEST |
 
 ---
 
@@ -60,3 +62,4 @@
 |---|---|
 | 2026-04-18 | Decret Imperial — creation Fregate 00 FERRUS FORGE |
 | 2026-04-18 | Fondation : architecture, contrat, structure, docs initialises |
+| 2026-04-18 | Developpement : forge_convert.py + forge_main.ipynb livres |
