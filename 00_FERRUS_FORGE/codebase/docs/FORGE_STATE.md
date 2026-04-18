@@ -1,10 +1,10 @@
 # FORGE_STATE.md — Phylactere de Resurrection
 # FREGATE 00 : FERRUS FORGE
-# Derniere mise a jour : 2026-04-18 (FONDATION — DECRET IMPERIAL EMIS)
+# Derniere mise a jour : 2026-04-18 (VALIDATION IMPERIALE COMPLETE)
 
 ---
 
-[STATUS] : PRET_POUR_VALIDATION — Phase 5 Developpement Divin TERMINE
+[STATUS] : OPERATIONNELLE — Validation en production reussie
 
 [LAST_WORK] :
 - Decret Imperial emis : Fregate 00 FERRUS FORGE creee
@@ -16,14 +16,16 @@
 - Fichiers docs/ initialises (STATE, PRD, ROADMAP, VALIDATION)
 - forge_convert.py livre : detection format, import GLB/OBJ/FBX, nettoyage, validation R15, export .blend, rapport JSON
 - forge_main.ipynb livre : 5 cellules (GIT SYNC, SETUP, CONFIG, CONVERSION, RAPPORT)
+- SETUP patche : detection Blender intelligente (scan Drive/tools/) + telechargement auto depuis internet (bypass Drive FUSE PermissionError)
+- VALIDATION IMPERIALE : 2/2 FBX convertis en .blend — Armature OK — R15 15/15 — zero erreur
 
-[NEXT_TASK] : VALIDATION IMPERIALE — test bout en bout sur avatars reels (GLB, OBJ, FBX)
+[NEXT_TASK] : Transfert des .blend vers FERRUS CORPUS IN_AVATAR/ puis validation CORPUS
 
-[STATUS] : PRET_POUR_VALIDATION — tous les modules implementes, test en production autorise
+[STATUS] : OPERATIONNELLE
 
 [BLOCKERS] : Aucun
 
-[SOLUTIONS] : -
+[SOLUTIONS] : Drive FUSE ne conserve pas les permissions +x → Blender telecharge depuis internet au premier lancement
 
 [LINKS] :
 - Depot GitHub : https://github.com/kioka8877-ux/FLOTTE-FERRUS
@@ -63,3 +65,5 @@
 | 2026-04-18 | Decret Imperial — creation Fregate 00 FERRUS FORGE |
 | 2026-04-18 | Fondation : architecture, contrat, structure, docs initialises |
 | 2026-04-18 | Developpement : forge_convert.py + forge_main.ipynb livres |
+| 2026-04-18 | Correction SETUP : scan Drive intelligent + telechargement Blender auto |
+| 2026-04-18 | VALIDATION IMPERIALE : 2/2 FBX → .blend OK (R15 15/15, zero erreur) |

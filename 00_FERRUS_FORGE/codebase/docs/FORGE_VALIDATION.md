@@ -57,8 +57,8 @@ Tous les tests s'executent dans Colab via forge_main.ipynb.
 | Statut rapport | `status: "OK"` |
 | Armature | `armature_found: true` |
 
-**Resultat :** [ ] PASS / [ ] FAIL
-**Notes :**
+**Resultat :** [x] PASS
+**Notes :** Teste en production 2026-04-18 — ferrus_P1.fbx + ferrus_P2.fbx → .blend OK, Armature True, R15 15/15
 
 ---
 
@@ -128,8 +128,8 @@ Tous les tests s'executent dans Colab via forge_main.ipynb.
 |---|---|---|
 | TEST 01 | Conversion .glb | EN ATTENTE |
 | TEST 02 | Conversion .obj | EN ATTENTE |
-| TEST 03 | Conversion .fbx | EN ATTENTE |
-| TEST 04 | Multi-acteurs formats mixtes | EN ATTENTE |
+| TEST 03 | Conversion .fbx | PASS (2026-04-18) |
+| TEST 04 | Multi-acteurs formats mixtes | PASS partiel — 2 FBX OK (2026-04-18) |
 | TEST 05 | Nommage miroir | EN ATTENTE |
 | TEST 06 | Compatibilite CORPUS | EN ATTENTE |
 | TEST 07 | Resilience format inconnu | EN ATTENTE |
