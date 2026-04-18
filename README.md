@@ -49,8 +49,8 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 
 | FREGATE | NOM | STATUT |
 |---|---|---|
-| 01 | FERRUS ANIMUS | OPERATIONNELLE - Developpement autorise |
-| 02 | ??? (decret futur) | EN ATTENTE DE DECRET IMPERIAL |
+| 01 | FERRUS ANIMUS | OPERATIONNELLE - Pipeline complet livre |
+| 02 | FERRUS CORPUS | PLANIFICATION - Developpement autorise |
 | 03 | ??? (decret futur) | EN ATTENTE DE DECRET IMPERIAL |
 
 ---
@@ -92,6 +92,41 @@ DeepMotion FBX
     FERRUS_PRD.md        <- Bible Technique
     FERRUS_ROADMAP.md    <- Plan de Conquete
     FERRUS_VALIDATION.md <- Protocole de Test
+```
+
+---
+
+## Fregate 02 - FERRUS CORPUS
+
+**Mission :** Incarner les animations R15 de FERRUS ANIMUS dans un avatar Roblox.
+Transformer un squelette invisible en acteur visible, exportable en .blend (MASTER) et .glb (PREVIEW).
+
+```
+ferrus_P*.fbx (squelette R15 anime)
+     +
+avatar_r15.blend (mesh Roblox)
+     |
+  [INJECT] - Transfert direct R15->R15 (noms identiques, zero mapping)
+     |
+ corpus_P*.blend  <- MASTER pour EXODUS U01
+ corpus_P*.glb    <- PREVIEW viewer en ligne
+```
+
+### Structure
+
+```
+02_FERRUS_CORPUS/
+  codebase/
+    inject_animation.py  <- Script Blender headless (coeur)
+    corpus_main.ipynb    <- Notebook Colab
+  IN/          <- ferrus_P*.fbx depuis 01_FERRUS_ANIMUS/OUT/
+  IN_AVATAR/   <- avatar_r15.blend (fourni une fois)
+  OUT/         <- corpus_P*.blend + corpus_P*.glb + rapport_corpus.json
+  docs/
+    CORPUS_STATE.md      <- Phylactere de Resurrection
+    CORPUS_PRD.md        <- Bible Technique
+    CORPUS_ROADMAP.md    <- Plan de Conquete
+    CORPUS_VALIDATION.md <- Protocole de Test
 ```
 
 ---
