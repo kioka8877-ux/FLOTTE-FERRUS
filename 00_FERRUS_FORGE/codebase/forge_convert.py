@@ -8,7 +8,7 @@ Usage (Blender headless) :
         --output-blend /path/to/avatar_P1.blend \
         --report-json  /path/to/report_P1.json
 
-Formats supportes : .glb / .gltf / .obj / .fbx
+Formats supportes : .glb / .gltf / .obj / .fbx / .blend
 
 POUR L'EMPEROR. POUR LA FLOTTE FERRUS.
 """
@@ -31,7 +31,7 @@ R15_BONES = {
     "RightUpperLeg", "RightLowerLeg", "RightFoot",
 }
 
-SUPPORTED_FORMATS = {".glb", ".gltf", ".obj", ".fbx"}
+SUPPORTED_FORMATS = {".glb", ".gltf", ".obj", ".fbx", ".blend"}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -115,6 +115,8 @@ elif ext == ".obj":
     bpy.ops.import_scene.obj(filepath=INPUT_PATH)
 elif ext == ".fbx":
     bpy.ops.import_scene.fbx(filepath=INPUT_PATH)
+elif ext == ".blend":
+    bpy.ops.wm.open_mainfile(filepath=INPUT_PATH)
 
 new_objects = set(bpy.context.scene.objects) - objects_before
 print(f"[FORGE] Import OK — {len(new_objects)} objet(s) importe(s)")
