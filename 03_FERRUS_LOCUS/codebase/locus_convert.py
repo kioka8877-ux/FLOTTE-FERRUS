@@ -1,0 +1,303 @@
+# =============================================================================
+# FERRUS LOCUS — locus_convert.py
+# Fregate 03 | Pipeline PLY + Image 360deg -> GLB texture
+# FLOTTE FERRUS | AD MAJOREM GLORIAM IMPERATORIS
+# =============================================================================
+
+import bpy
+import os
+import sys
+import json
+import argparse
+import math
+from pathlib import Path
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+SUPPORTED_PLY = {".ply"}
+SUPPORTED_IMG = {".jpg", ".jpeg", ".png", ".hdr", ".exr"}
+
+# Decimation Option C : auto par defaut, override manuel possible
+# "auto"   = detection automatique selon nb de faces
+# "none"   = mesh original intact
+# "high"   = garde 25% des faces
+# "medium" = garde 10% des faces
+# "low"    = garde 3% des faces
+DECIMATION_LEVEL = "auto"
+
+DECIMATION_RATIO = {
+    "none"  : 1.0,
+    "high"  : 0.25,
+    "medium": 0.10,
+    "low"   : 0.03,
+}
+
+DECIMATION_AUTO_THRESHOLDS = {
+    5_000_000: "low",
+    1_000_000: "medium",
+    300_000  : "high",
+    0        : "none",
+}
+
+BAKE_RESOLUTION = 2048  # pixels (2048x2048)
+
+# =============================================================================
+# ARGUMENTS
+# =============================================================================
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="FERRUS LOCUS — PLY + 360 -> GLB")
+    parser.add_argument("--ply",    required=True,  help="Chemin vers le fichier .ply")
+    parser.add_argument("--img360", required=True,  help="Chemin vers l\'image 360 (jpg/png/hdr)")
+    parser.add_argument("--output", required=True,  help="Chemin de sortie .glb")
+    parser.add_argument("--decim",  default="auto",
+                        choices=["auto", "none", "high", "medium", "low"],
+                        help="Niveau de decimation (defaut: auto)")
+    parser.add_argument("--bake-res", type=int, default=2048,
+                        help="Resolution de baking en pixels (defaut: 2048)")
+    # Blender passe ses propres args avant "--", on ignore tout avant
+    argv = sys.argv
+    if "--" in argv:
+        argv = argv[argv.index("--") + 1:]
+    else:
+        argv = []
+    return parser.parse_args(argv)
+
+# =============================================================================
+# OP 1 — MESH : Import PLY + nettoyage
+# =============================================================================
+
+def op_mesh_import(ply_path: str) -> bpy.types.Object:
+    """Importe le .ply, nettoie le mesh, retourne l\'objet Blender."""
+    print(f"[LOCUS][MESH] Import: {ply_path}")
+
+    # Purger la scene par defaut
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+
+    # Import PLY
+    bpy.ops.wm.ply_import(filepath=ply_path)
+    obj = bpy.context.selected_objects[0]
+    bpy.context.view_layer.objects.active = obj
+
+    # Passer en mode edition pour le nettoyage
+    bpy.ops.object.mode_set(mode=\'EDIT\')
+
+    # Supprimer les vertices isoles
+    bpy.ops.mesh.select_all(action=\'SELECT\')
+    bpy.ops.mesh.delete_loose()
+
+    # Reparer les faces non-manifold (basique)
+    bpy.ops.mesh.select_non_manifold()
+    bpy.ops.mesh.fill_holes(sides=4)
+
+    bpy.ops.object.mode_set(mode=\'OBJECT\')
+
+    face_count = len(obj.data.polygons)
+    print(f"[LOCUS][MESH] Faces apres import: {face_count:,}")
+    return obj
+
+# =============================================================================
+# OP 1b — DECIMATION : Reduction du maillage
+# =============================================================================
+
+def resolve_decimation_level(obj: bpy.types.Object, level: str) -> str:
+    """Resout le niveau effectif si mode auto."""
+    if level != "auto":
+        return level
+    face_count = len(obj.data.polygons)
+    for threshold in sorted(DECIMATION_AUTO_THRESHOLDS.keys(), reverse=True):
+        if face_count >= threshold:
+            resolved = DECIMATION_AUTO_THRESHOLDS[threshold]
+            print(f"[LOCUS][DECIM] Auto: {face_count:,} faces -> niveau '{resolved}'")
+            return resolved
+    return "none"
+
+def op_decimate(obj: bpy.types.Object, level: str):
+    """Applique un modificateur Decimate selon le niveau."""
+    effective_level = resolve_decimation_level(obj, level)
+    ratio = DECIMATION_RATIO.get(effective_level, 1.0)
+
+    if ratio >= 1.0:
+        print("[LOCUS][DECIM] Pas de decimation appliquee.")
+        return
+
+    face_before = len(obj.data.polygons)
+    mod = obj.modifiers.new(name="LOCUS_Decimate", type=\'DECIMATE\')
+    mod.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    face_after = len(obj.data.polygons)
+    print(f"[LOCUS][DECIM] {face_before:,} -> {face_after:,} faces (ratio {ratio})")
+
+# =============================================================================
+# OP 2 — BAKE : Projection UV + baking de la texture 360
+# =============================================================================
+
+def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
+    """Projette l\'image 360 sur le mesh via UV baking."""
+    print(f"[LOCUS][BAKE] Image 360: {img360_path} | Resolution: {bake_res}x{bake_res}")
+
+    # --- Scene world : charger l\'image 360 comme environment ---
+    world = bpy.data.worlds.new("LOCUS_World")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    wnt = world.node_tree
+    wnt.nodes.clear()
+
+    bg_node  = wnt.nodes.new(\'ShaderNodeBackground\')
+    env_node = wnt.nodes.new(\'ShaderNodeTexEnvironment\')
+    out_node = wnt.nodes.new(\'ShaderNodeOutputWorld\')
+
+    img360 = bpy.data.images.load(img360_path)
+    env_node.image = img360
+
+    wnt.links.new(env_node.outputs[\'Color\'], bg_node.inputs[\'Color\'])
+    wnt.links.new(bg_node.outputs[\'Background\'], out_node.inputs[\'Surface\'])
+
+    # --- UV Map : Smart UV Project ---
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode=\'EDIT\')
+    bpy.ops.mesh.select_all(action=\'SELECT\')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.02)
+    bpy.ops.object.mode_set(mode=\'OBJECT\')
+
+    # --- Image cible pour baking ---
+    bake_img = bpy.data.images.new("LOCUS_BakeTarget", width=bake_res, height=bake_res)
+
+    # --- Materiau avec noeud Image pour recevoir le bake ---
+    mat = bpy.data.materials.new("LOCUS_Mat")
+    mat.use_nodes = True
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+
+    nt = mat.node_tree
+    nt.nodes.clear()
+
+    bsdf_node    = nt.nodes.new(\'ShaderNodeBsdfPrincipled\')
+    out_mat_node = nt.nodes.new(\'ShaderNodeOutputMaterial\')
+    img_node     = nt.nodes.new(\'ShaderNodeTexImage\')
+    img_node.image = bake_img
+
+    nt.links.new(img_node.outputs[\'Color\'], bsdf_node.inputs[\'Base Color\'])
+    nt.links.new(bsdf_node.outputs[\'BSDF\'], out_mat_node.inputs[\'Surface\'])
+
+    # Selectionner le noeud image pour le bake
+    img_node.select = True
+    nt.nodes.active = img_node
+
+    # --- Baking ---
+    bpy.context.scene.render.engine = \'CYCLES\'
+    bpy.context.scene.cycles.device = \'CPU\'
+    bpy.context.scene.cycles.samples = 1  # 1 sample suffit pour bake Emit
+    bpy.context.scene.render.bake.use_pass_direct = False
+    bpy.context.scene.render.bake.use_pass_indirect = False
+
+    print("[LOCUS][BAKE] Baking en cours (CPU)...")
+    bpy.ops.object.bake(type=\'DIFFUSE\')
+    print("[LOCUS][BAKE] Baking termine.")
+
+    return bake_img
+
+# =============================================================================
+# OP 3 — SEAL : Nettoyage final + export GLB
+# =============================================================================
+
+def op_seal_export(obj: bpy.types.Object, output_path: str):
+    """Verifie le mesh, exporte en .glb."""
+    print(f"[LOCUS][SEAL] Export GLB: {output_path}")
+
+    # S\'assurer que seul cet objet est selectionne
+    bpy.ops.object.select_all(action=\'DESELECT\')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
+    # Export GLB
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    bpy.ops.export_scene.gltf(
+        filepath=output_path,
+        export_format=\'GLB\',
+        use_selection=True,
+        export_texcoords=True,
+        export_normals=True,
+        export_materials=\'EXPORT\',
+        export_colors=True,
+    )
+
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"[LOCUS][SEAL] Fichier produit: {output_path} ({size_mb:.2f} Mo)")
+    return size_mb
+
+# =============================================================================
+# RAPPORT JSON
+# =============================================================================
+
+def write_rapport(output_path: str, rapport: dict):
+    rapport_path = str(Path(output_path).parent / "rapport_locus.json")
+    with open(rapport_path, "w", encoding="utf-8") as f:
+        json.dump(rapport, f, indent=2, ensure_ascii=False)
+    print(f"[LOCUS][RAPPORT] {rapport_path}")
+
+# =============================================================================
+# MAIN PIPELINE
+# =============================================================================
+
+def main():
+    args = parse_args()
+
+    ply_path   = args.ply
+    img360_path= args.img360
+    output_path= args.output
+    decim_level= args.decim
+    bake_res   = args.bake_res
+
+    # Validations
+    if not os.path.exists(ply_path):
+        raise FileNotFoundError(f"PLY introuvable: {ply_path}")
+    if not os.path.exists(img360_path):
+        raise FileNotFoundError(f"Image 360 introuvable: {img360_path}")
+    if Path(ply_path).suffix.lower() not in SUPPORTED_PLY:
+        raise ValueError(f"Format PLY non supporte: {Path(ply_path).suffix}")
+    if Path(img360_path).suffix.lower() not in SUPPORTED_IMG:
+        raise ValueError(f"Format image non supporte: {Path(img360_path).suffix}")
+
+    rapport = {
+        "status": "RUNNING",
+        "input_ply": ply_path,
+        "input_img360": img360_path,
+        "output_glb": output_path,
+        "decimation_level": decim_level,
+        "bake_resolution": bake_res,
+    }
+
+    try:
+        # OP 1 — MESH
+        obj = op_mesh_import(ply_path)
+        rapport["faces_raw"] = len(obj.data.polygons)
+
+        # OP 1b — DECIMATION
+        op_decimate(obj, decim_level)
+        rapport["faces_final"] = len(obj.data.polygons)
+        rapport["decimation_applied"] = decim_level
+
+        # OP 2 — BAKE
+        op_bake_texture(obj, img360_path, bake_res)
+
+        # OP 3 — SEAL
+        size_mb = op_seal_export(obj, output_path)
+        rapport["output_size_mb"] = round(size_mb, 2)
+        rapport["status"] = "SUCCESS"
+
+    except Exception as e:
+        rapport["status"] = "ERROR"
+        rapport["error"] = str(e)
+        print(f"[LOCUS][ERROR] {e}")
+        raise
+
+    finally:
+        write_rapport(output_path, rapport)
+
+    print("[LOCUS] PIPELINE COMPLET. POUR L\'EMPEROR.")
+
+if __name__ == "__main__":
+    main()
