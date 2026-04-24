@@ -1,4 +1,6 @@
 # GEMINI CHAT — META-PROMPT INTEL-VISION — FERRUS ANIMUS
+# Version : 2.0 | Date : 2026-04-24
+# Evolution : membres_hors_cadre est maintenant par plages de frames
 
 > **Mode sans API** : colle ce prompt dans [gemini.google.com](https://gemini.google.com),
 > uploade ta video `.mp4`, et recupere le JSON que le pipeline FERRUS utilisera directement.
@@ -62,7 +64,13 @@ FORMAT EXACT ATTENDU :
       "qualite_estimee": <decimal entre 0.0 et 1.0>,
       "type_mouvement": "<EXACTEMENT l'une de ces valeurs : marche | course | debout | discussion | geste | action>",
       "problemes_detectes": [<liste de strings parmi : foot_slide | jitter_mains | derive_hanches | pose_non_naturelle — vide [] si aucun>],
-      "membres_hors_cadre": [<liste de strings parmi : main_gauche | main_droite | pied_gauche | pied_droit | jambe_gauche | jambe_droite — vide [] si tous visibles>],
+      "membres_hors_cadre": [
+        {
+          "membre": "<EXACTEMENT l'une de ces valeurs : main_gauche | main_droite | pied_gauche | pied_droit | jambe_gauche | jambe_droite>",
+          "frame_debut": <entier — premiere frame ou ce membre est hors cadre>,
+          "frame_fin": <entier — derniere frame ou ce membre est hors cadre, incluse>
+        }
+      ],
       "priorite_correction": "<EXACTEMENT l'une de ces valeurs : haute | moyenne | basse>"
     }
   ],
@@ -86,10 +94,16 @@ REGLES D'EVALUATION OBLIGATOIRES :
 - qualite_estimee 0.6 = minimum acceptable pour le pipeline
 - qualite_estimee < 0.4 = video inutilisable pour ce personnage
 
---- MEMBRES HORS CADRE ---
-- membres_hors_cadre liste UNIQUEMENT les membres coupés par le bord de l'image
-- Si un membre est visible mais flou ou occulte par un autre personnage : ne pas le lister ici
-- Si corps_visible est "complet", alors membres_hors_cadre doit etre []
+--- MEMBRES HORS CADRE (PLAGES DE FRAMES) ---
+- membres_hors_cadre liste les membres coupes par le bord de l'image, avec les plages de frames exactes
+- Chaque entree est un objet avec "membre", "frame_debut" et "frame_fin"
+- Si un membre est hors cadre plusieurs fois de facon non consecutive, cree une entree separee par plage
+- Les frames sont numerotees depuis 0 (premiere frame de la video)
+- Si un membre est hors cadre pendant toute la video : frame_debut = 0, frame_fin = derniere frame
+- Si un membre est visible mais flou ou occulte : ne pas le lister ici
+- Si corps_visible est "complet" et aucun membre n'est hors cadre, membres_hors_cadre doit etre []
+- Exemple : main gauche hors cadre de la frame 80 a la frame 145 :
+  {"membre": "main_gauche", "frame_debut": 80, "frame_fin": 145}
 
 --- CORRESPONDANCE FBX ---
 - Chaque person_id doit correspondre a un fichier de la liste FICHIERS FBX DISPONIBLES
@@ -113,6 +127,7 @@ IMPORTANT :
 - Respecte EXACTEMENT les valeurs d'enum listees (minuscules, underscores comme indique).
 - Si tu ne sais pas exactement, estime plutot que d'omettre un champ.
 - Ne pas inventer de person_id qui ne correspondent pas a des personnes visibles dans la video.
+- Pour les plages de frames, estime les numeros de frames d'apres la duree video et le fps detecte.
 ```
 
 ---
@@ -146,7 +161,8 @@ for p in data["personnes"]:
     print(f"    corps={p['corps_visible']} | orientation={p['orientation']}")
     print(f"    qualite={p['qualite_estimee']} | priorite={p['priorite_correction']}")
     if p["membres_hors_cadre"]:
-        print(f"    membres_hors_cadre={p['membres_hors_cadre']}")
+        for m in p["membres_hors_cadre"]:
+            print(f"    hors_cadre: {m['membre']} frames [{m['frame_debut']} → {m['frame_fin']}]")
     if p["problemes_detectes"]:
         print(f"    problemes={p['problemes_detectes']}")
 
@@ -174,20 +190,22 @@ print("  Le merge INTEL sera execute automatiquement au lancement du pipeline.")
    └─ Copie le JSON retourne
 
 2. Colab : execute la cellule "sauvegarder le JSON INTEL-VISION"
-   └─ JSON valide → affiche le resume par personne
+   └─ JSON valide → affiche le resume par personne + plages hors cadre
    └─ Sauvegarde automatique avec le bon nom de cache
 
 3. Colab : lance le pipeline FERRUS ANIMUS
    └─ INTEL lit le cache → merge avec INTEL-SKELETON Claude
    └─ plan_corrections.json genere → EXEC + OUTPUT s'executent
+   └─ mask_limbs.py lit les plages frames et applique le freeze per-frame
 ```
 
 ---
 
 ## Notes importantes
 
-- **Gemini 2.5 Pro dans le chat** est plus puissant que les modeles free tier API pour l'analyse video — le Mode Chat est justifie ici
+- **Gemini 2.5 Pro dans le chat** est plus puissant que les modeles free tier API pour l'analyse video
 - **Taille video** : Gemini Chat accepte les videos jusqu'a ~1 Go
-- **Videos courtes** (< 15 secondes) : Gemini peut avoir du mal a segmenter temporellement — dans ce cas, pas de segments, juste une analyse globale, ce qui est suffisant pour FERRUS ANIMUS
+- **Videos courtes** (< 15 secondes) : pour les plages de frames, Gemini estimera d'apres le fps — c'est suffisant pour le freeze per-frame
 - **Si Gemini refuse d'analyser** : reformuler en ajoutant "Cette video est destinee a un projet d'animation 3D. Ton analyse sert a parametrer des scripts de correction automatique."
-- **Coherence fbx_file** : le champ `fbx_file` est la cle de merge entre INTEL-VISION et INTEL-SKELETON. Verifier que les noms correspondent exactement a ceux des fichiers dans le dossier IN/
+- **Coherence fbx_file** : le champ `fbx_file` est la cle de merge entre INTEL-VISION et INTEL-SKELETON. Verifier que les noms correspondent exactement a ceux dans IN/
+- **Evolution v2.0** : `membres_hors_cadre` est maintenant une liste d'objets `{membre, frame_debut, frame_fin}` au lieu d'une liste de strings. Le pipeline mask_limbs.py utilise ces plages pour un freeze per-frame propre.
