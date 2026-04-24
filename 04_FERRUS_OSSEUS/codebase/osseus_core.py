@@ -421,8 +421,20 @@ def create_armature(joints: dict, template: str) -> bpy.types.Object:
             continue
 
         eb = edit_bones.new(bone_name)
-        eb.head = mathutils.Vector(joints[head_jnt])
-        eb.tail = mathutils.Vector(joints[tail_jnt])
+        head_pos = mathutils.Vector(joints[head_jnt])
+        tail_pos = mathutils.Vector(joints[tail_jnt])
+        # Bone terminal (head == tail) : etendre de 1 cm dans la direction du parent
+        if (tail_pos - head_pos).length < 0.001:
+            parent_head = mathutils.Vector(joints.get(head_jnt, head_pos))
+            # direction : reprendre celle du bone precedent ou +X par defaut
+            if parent_name and parent_name in created:
+                pb = created[parent_name]
+                direction = (pb.tail - pb.head).normalized()
+            else:
+                direction = mathutils.Vector((0.01, 0.0, 0.0))
+            tail_pos = head_pos + direction * 0.01
+        eb.head = head_pos
+        eb.tail = tail_pos
         eb.use_connect = False
         created[bone_name] = eb
 
