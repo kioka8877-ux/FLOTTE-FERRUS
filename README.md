@@ -52,7 +52,8 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 | 00 | FERRUS FORGE | OPERATIONNELLE - Validation imperiale 2026-04-18 |
 | 01 | FERRUS ANIMUS | OPERATIONNELLE - Pipeline complet livre |
 | 02 | FERRUS CORPUS | OPERATIONNELLE - Pipeline complet livre |
-| 03 | ??? (decret futur) | EN ATTENTE DE DECRET IMPERIAL |
+| 03 | FERRUS LOCUS | EN ATTENTE DE DECRET IMPERIAL |
+| 04 | FERRUS OSSEUS | OPERATIONNELLE - Validation imperiale 2026-04-24 |
 
 ---
 

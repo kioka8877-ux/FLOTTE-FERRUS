@@ -7,7 +7,7 @@
 
 ## Statut Global
 
-**PHASE : VALIDE EN PRODUCTION — 2/2 avatars OK**
+**PHASE : OPERATIONNELLE — Validation imperiale 2026-04-24**
 
 ---
 
