@@ -1,10 +1,10 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-17 (PIPELINE COMPLET — main_ferrus.ipynb TERMINE)
+# Derniere mise a jour : 2026-04-24 (MODE MIXAMO AJOUTE)
 
 ---
 
-[STATUS] : EN_COURS — Phase 5 Developpement Divin
+[STATUS] : OPERATIONNELLE — Mode MIXAMO ajoute, validation en production requise
 
 [LAST_WORK] :
 - Brainstorming de fondation complete (Codex Mechanicus Tome I valide)
@@ -14,19 +14,16 @@
 - Documents FERRUS (STATE, PRD, ROADMAP, VALIDATION) rediges
 - Module INTEL developpe : pre_parse_fbx.py + intel_skeleton.py
 - Session architecture INTEL : modes Chat valides, contrats JSON confirmes
-- EXEC Op.3 livree : remove_foot_slide.py — detection phases contact + gel X/Z (zero numpy)
-- EXEC Op.4 livree : camera_follow.py — 3 modes (static/lock/smooth_follow), rotation via to_track_quat
-- EXEC Op.5 livree : mask_limbs.py — neutralisation rotations bones hors cadre (quaternion + euler)
-- COMPARTIMENT EXEC : 5/5 operations TERMINEES
+- EXEC Op.1-5 livrees et operationnelles
 - OUTPUT livree : retarget_r15.py — rig R15 programmatique, matrix_basis quaternion, export selection
-- PIPELINE livre : main_ferrus.ipynb — 10 cellules, orchestration complete INTEL→EXEC→OUTPUT→RAPPORT
-- Validation en production demarree (session 2026-04-17) — SETUP + CONFIG + SCAN + INTEL OK
-- Dossiers GEMINI_IN/ et CLAUDE_IN/ crees pour depot persistant des JSON IA sur Drive
-- Notebook patche : cellule SETUP definit GEMINI_IN/CLAUDE_IN, cellule INTEL check CLAUDE_IN avant fallback, cellule GEMINI cherche dans GEMINI_IN en priorite
+- PIPELINE livre : main_ferrus.ipynb — 10 cellules, orchestration complete INTEL->EXEC->OUTPUT->RAPPORT
+- Validation en production reussie (2026-04-17)
+- SESSION 2026-04-24 : ajout mode MIXAMO (22 bones Mixamo.com) dans retarget_r15.py
+- SESSION 2026-04-24 : ajout selecteur RETARGET_MODE dans main_ferrus.ipynb (Cell 3 CONFIG)
 
-[NEXT_TASK] : VALIDATION IMPERIALE — continuer test bout en bout (cellules MERGE → EXEC → OUTPUT → RAPPORT)
+[NEXT_TASK] : Validation MIXAMO en production avec un FBX avatar rige par Mixamo.com
 
-[STATUS] : PRET_POUR_VALIDATION — tous les modules implementes, test en production autorise
+[STATUS] : PRET_POUR_VALIDATION_MIXAMO
 
 [BLOCKERS] : Aucun
 
@@ -36,7 +33,6 @@
 - Depot GitHub : https://github.com/kioka8877-ux/FLOTTE-FERRUS
 - Meta-prompt INTEL-VISION (Gemini) : FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md
 - Meta-prompt INTEL-SKELETON (Claude) : FERRUS_INTEL_SKELETON_CLAUDE_METAPROMPT.md
-- FBX de reference : WhatsApp_Video_2026-04-12...(includeTPose).fbx | 2.9 MB | FBX 7.7 Binary
 
 ---
 
@@ -52,7 +48,8 @@
 | EXEC | remove_foot_slide.py | TERMINE |
 | EXEC | camera_follow.py | TERMINE |
 | EXEC | mask_limbs.py | TERMINE |
-| OUTPUT | retarget_r15.py | TERMINE |
+| OUTPUT | retarget_r15.py — mode R15 | VALIDE EN PRODUCTION |
+| OUTPUT | retarget_r15.py — mode MIXAMO | IMPLEMENTE — VALIDATION REQUISE |
 | PIPELINE | main_ferrus.ipynb | TERMINE |
 
 ---
@@ -60,16 +57,15 @@
 ## Decisions Imperiales Actives
 
 - DeepMotion produit 1 FBX par personne (Option C : traitement sequentiel)
-- Rig R15 construit programmatiquement — ZERO fichier GLB requis
-- INTEL double tete : Gemini (video) + Claude API (FBX) → merge → plan_corrections.json
+- Rig cible construit programmatiquement — ZERO fichier GLB requis (R15 et Mixamo)
+- INTEL double tete : Gemini (video) + Claude API (FBX) -> merge -> plan_corrections.json
 - Rotations en quaternion forces au retargeting (prevenir gimbal lock)
 - Cache JSON par fichier FBX (zero retokenisation si deja analyse)
+- RETARGET_MODE = "R15" ou "MIXAMO" — choix dans Cell 3 du notebook
 
-## Decisions Validees — Session 2026-04-17
+## Historique des Sessions
 
-- MODE INTEL CHAT VALIDE : Gemini Chat + video.mp4 → intel_vision.json (copie manuelle Colab)
-- MODE INTEL CHAT VALIDE : Claude Chat + FBX brut (≤ 20 Mo) → intel_skeleton.json (copie manuelle Colab)
-- VERROU JSON = qualite du metaprompt (FORMAT EXACT ATTENDU + enums + champs requis)
-- Les deux metaprompts (INTEL-VISION + INTEL-SKELETON) constituent le double verrou JSON de la flotte
-- intel_skeleton.py reste valide pour le mode API (chemin alternatif automatise)
-- Deux modes d'entree pour Claude : FBX brut (chat) ou XML pre-parse (API via intel_skeleton.py) — meme contrat de sortie
+| Date | Evenement |
+|---|---|
+| 2026-04-17 | Pipeline complet livre et valide en production (R15) |
+| 2026-04-24 | Ajout mode MIXAMO 22 bones — retarget_r15.py + notebook |
