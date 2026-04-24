@@ -17,10 +17,21 @@
 # POUR L'EMPEROR. POUR LA FLOTTE FERRUS.
 # =============================================================================
 
+import sys
+import subprocess
+
+# numpy requis par io_scene_gltf2 (manquant dans Blender 3.x apt)
+try:
+    import numpy
+except ImportError:
+    print("[OSSEUS] numpy absent — installation dans le Python de Blender...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "numpy"],
+                   check=True)
+    print("[OSSEUS] numpy installe.")
+
 import bpy
 import mathutils
 import os
-import sys
 import json
 import math
 from pathlib import Path
