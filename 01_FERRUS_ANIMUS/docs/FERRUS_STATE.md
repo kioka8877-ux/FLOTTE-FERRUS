@@ -1,10 +1,10 @@
 # FERRUS_STATE.md — Phylactere de Resurrection
 # FREGATE 01 : FERRUS ANIMUS
-# Derniere mise a jour : 2026-04-24 (MODE MIXAMO AJOUTE)
+# Derniere mise a jour : 2026-04-24 (REFACTORISATION ARCHITECTURALE)
 
 ---
 
-[STATUS] : OPERATIONNELLE — Mode MIXAMO ajoute, validation en production requise
+[STATUS] : EN REFACTORISATION — Reconstruction architecturale complete suite a corruption detectee
 
 [LAST_WORK] :
 - Brainstorming de fondation complete (Codex Mechanicus Tome I valide)
@@ -18,12 +18,17 @@
 - OUTPUT livree : retarget_r15.py — rig R15 programmatique, matrix_basis quaternion, export selection
 - PIPELINE livre : main_ferrus.ipynb — 10 cellules, orchestration complete INTEL->EXEC->OUTPUT->RAPPORT
 - Validation en production reussie (2026-04-17)
-- SESSION 2026-04-24 : ajout mode MIXAMO (22 bones Mixamo.com) dans retarget_r15.py
-- SESSION 2026-04-24 : ajout selecteur RETARGET_MODE dans main_ferrus.ipynb (Cell 3 CONFIG)
+- SESSION 2026-04-24 (matin) : ajout mode MIXAMO dans retarget_r15.py + notebook
+- SESSION 2026-04-24 (apres-midi) : CORRUPTION DETECTEE — bug de conception fondamental
+  → ANIMUS ne prenait qu'un seul FBX (DeepMotion), construisait le squelette from scratch
+  → Avatar OSSEUS n'entrait jamais dans le pipeline
+  → Brainstorming architectural complet execute
+  → Decision : refactorisation complete selon nouvelle vision
+- SESSION 2026-04-24 (soir) : mise a jour docs de suivi (PRD v2, ROADMAP Phase 7, VALIDATION Section VII)
 
-[NEXT_TASK] : Validation MIXAMO en production avec un FBX avatar rige par Mixamo.com
+[NEXT_TASK] : Refactorisation mask_limbs.py (per-frame freeze)
 
-[STATUS] : PRET_POUR_VALIDATION_MIXAMO
+[STATUS] : PRET_POUR_REFACTORISATION
 
 [BLOCKERS] : Aucun
 
@@ -40,32 +45,49 @@
 
 | COMPARTIMENT | MODULE | STATUT |
 |---|---|---|
-| INTEL | pre_parse_fbx.py | TERMINE |
-| INTEL | intel_skeleton.py | TERMINE |
+| INTEL | pre_parse_fbx.py | TERMINE — pas de modification requise |
+| INTEL | intel_skeleton.py | TERMINE — pas de modification requise |
 | INTEL | prompts/correction_prompt.txt | PLACEHOLDER |
-| EXEC | smooth_fcurves.py | TERMINE |
-| EXEC | stabilize_hips.py | TERMINE |
-| EXEC | remove_foot_slide.py | TERMINE |
-| EXEC | camera_follow.py | TERMINE |
-| EXEC | mask_limbs.py | TERMINE |
-| OUTPUT | retarget_r15.py — mode R15 | VALIDE EN PRODUCTION |
-| OUTPUT | retarget_r15.py — mode MIXAMO | IMPLEMENTE — VALIDATION REQUISE |
-| PIPELINE | main_ferrus.ipynb | TERMINE |
+| EXEC | smooth_fcurves.py | TERMINE — pas de modification requise |
+| EXEC | stabilize_hips.py | TERMINE — pas de modification requise |
+| EXEC | remove_foot_slide.py | TERMINE — pas de modification requise |
+| EXEC | camera_follow.py | TERMINE — pas de modification requise |
+| EXEC | mask_limbs.py | EN REFACTORISATION — per-frame freeze |
+| OUTPUT | retarget_r15.py | EN REFACTORISATION — ajout mode DEEPMOTION + mesh injection |
+| PIPELINE | main_ferrus.ipynb | EN REFACTORISATION — Cells 2/3/4/9 |
+| DOCS | FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md | EN REFACTORISATION — plages frames |
 
 ---
 
 ## Decisions Imperiales Actives
 
-- DeepMotion produit 1 FBX par personne (Option C : traitement sequentiel)
-- Rig cible construit programmatiquement — ZERO fichier GLB requis (R15 et Mixamo)
-- INTEL double tete : Gemini (video) + Claude API (FBX) -> merge -> plan_corrections.json
+- ANIMUS prend 2 FBX par personne : IN/ (DeepMotion animation) + IN_AVATAR/ (OSSEUS mesh+rig)
+- BONES_MODE remplace RETARGET_MODE — 3 options : "DEEPMOTION" / "MIXAMO" / "R15"
+- Mode DEEPMOTION : transfer direct FCurves (meme squelette 52 bones), output AVEC mesh
+- Mode MIXAMO : retargeting 52->26, injection mesh OSSEUS si fourni
+- Mode R15 : retargeting 52->15, injection mesh OSSEUS si fourni
+- mask_limbs.py : freeze per-frame a la derniere position connue (Option A)
+- intel_vision.json : membres_hors_cadre = [{membre, frame_debut, frame_fin}]
+- Avatar OSSEUS lu en lecture seule — jamais modifie
 - Rotations en quaternion forces au retargeting (prevenir gimbal lock)
 - Cache JSON par fichier FBX (zero retokenisation si deja analyse)
-- RETARGET_MODE = "R15" ou "MIXAMO" — choix dans Cell 3 du notebook
+
+## Ordre de Refactorisation
+
+| ORDRE | FICHIER | NATURE |
+|---|---|---|
+| 1 | FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md | Docs — plages frames membres |
+| 2 | mask_limbs.py | Code — per-frame freeze |
+| 3 | retarget_r15.py | Code — mode DEEPMOTION + mesh injection |
+| 4 | main_ferrus.ipynb | Code — Cells 2/3/4/9 |
+| 5 | FERRUS_PRD.md | Docs — vision v2 |
+| 6 | FERRUS_STATE.md | Docs — etat post-refactorisation |
 
 ## Historique des Sessions
 
 | Date | Evenement |
 |---|---|
 | 2026-04-17 | Pipeline complet livre et valide en production (R15) |
-| 2026-04-24 | Ajout mode MIXAMO 22 bones — retarget_r15.py + notebook |
+| 2026-04-24 matin | Ajout mode MIXAMO 22 bones — retarget_r15.py + notebook |
+| 2026-04-24 apres-midi | Corruption detectee — brainstorming architectural complet |
+| 2026-04-24 soir | Docs de suivi mis a jour — refactorisation prete a demarrer |
