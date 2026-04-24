@@ -1,12 +1,13 @@
 # OSSEUS_STATE.md — Etat de la Fregate FERRUS OSSEUS
 # Phylactere de Resurrection — Fregate 04
 # FLOTTE FERRUS | AD MAJOREM GLORIAM IMPERATORIS
+# Derniere mise a jour : 2026-04-24
 
 ---
 
 ## Statut Global
 
-**PHASE : ALPHA — En attente de validation production**
+**PHASE : VALIDE EN PRODUCTION — 2/2 avatars OK**
 
 ---
 
@@ -20,18 +21,20 @@
 
 | Composant | Etat | Notes |
 |-----------|------|-------|
-| `osseus_core.py` | LIVRE | Script Blender headless complet |
-| `osseus_main.ipynb` | LIVRE | Notebook Colab 8 cellules |
+| `osseus_core.py` | VALIDE | Script Blender headless complet |
+| `osseus_main.ipynb` | VALIDE | Notebook Colab 8 cellules |
 | `README.md` | LIVRE | Documentation complete |
-| Template R15 (15 bones) | LIVRE | Naming Roblox standard |
-| Template Mixamo (26 bones) | LIVRE | Prefix mixamorig: |
-| Template DeepMotion (52 bones) | LIVRE | Corps complet + doigts |
-| Import GLB/GLTF/OBJ/FBX | LIVRE | |
-| Detection bbox T-pose | LIVRE | |
-| Placement squelette auto | LIVRE | Proportions anatomiques |
-| Automatic Weights | LIVRE | Fallback Envelope si echec |
-| Export FBX rige | LIVRE | |
-| Rapport JSON | LIVRE | |
+| Template R15 (15 bones) | VALIDE EN PRODUCTION | 2 avatars GLB traites — Automatic Weights OK |
+| Template Mixamo (26 bones) | LIVRE | Non teste en production |
+| Template DeepMotion (52 bones) | LIVRE | Non teste en production |
+| Import GLB/GLTF/OBJ/FBX | VALIDE | GLB valide en production |
+| Detection bbox T-pose | VALIDE | Hauteur/largeur correctement calculees |
+| Placement squelette auto | VALIDE | Proportions anatomiques OK |
+| Automatic Weights | VALIDE | AUTO sur les 2 avatars |
+| Export FBX rige | VALIDE | 2.53 Mo + 3.08 Mo |
+| Rapport JSON | VALIDE | status=SUCCESS confirme |
+| Batch multi-avatars (P1, P2...) | VALIDE | 2 avatars traites en un seul run |
+| numpy auto-injection (Cell 3) | VALIDE | wheel cp310 telecharge + extraction manuelle |
 
 ---
 
@@ -39,14 +42,12 @@
 
 | Test | Priorite | Notes |
 |------|----------|-------|
-| Pipeline complet sur vrai avatar GLB | CRITIQUE | Valider en production Colab |
-| Template R15 sur avatar Roblox standard | HAUTE | |
 | Template Mixamo sur avatar game | HAUTE | |
 | Template DeepMotion 52 bones | MOYENNE | |
 | Avatar multi-mesh (PLY split) | MOYENNE | Join teste en theorie |
 | Avatar non-centre (offset X/Y) | HAUTE | bbox prend en compte le centre |
 | Avatar echelle non-standard | MOYENNE | Transform apply avant bbox |
-| Automatic Weights echec -> fallback | BASSE | Code present, non teste |
+| Automatic Weights echec -> fallback Envelope | BASSE | Code present, non teste |
 
 ---
 
@@ -56,38 +57,35 @@
 |------------|---------------|
 | T-pose obligatoire | Aucun — OSSEUS ne detecte pas la pose |
 | Proportions fixes (humanoide standard) | Fonctionne pour 90% des avatars game |
-| Doigts DeepMotion : positions approx | Suffisant pour auto-weights basiques |
-| Pas de fingers detailles (R15/Mixamo) | Normal — ces templates n'ont pas de doigts |
+| Blender 3.x apt sans numpy | Cell 3 injecte numpy cp310 automatiquement |
+| Blender Drive FUSE non executable | Version parsee depuis le chemin ; binaire apt utilise |
+
+---
+
+## Notes de Production (2026-04-24)
+
+- Blender 3.0 installe via apt (miroirs Ubuntu 404 → resolu avec apt-get update + --fix-missing)
+- numpy absent dans Blender 3.0 apt → injection manuelle wheel cp310 (numpy 2.2.6 manylinux)
+- Extraction du wheel via zipfile (pip refuse d'installer un wheel cross-platform)
+- numpy.libs/ obligatoire en plus de numpy/ (contient libscipy_openblas64)
+- Pipeline batch 2/2 SUCCESS : avatar_P1.glb (31601 v) + avatar_P2.glb (30630 v)
 
 ---
 
 ## Prochaine Etape
 
-1. **Tester en production** sur un vrai avatar GLB en T-pose
-2. Valider le rapport JSON (`status: SUCCESS`)
-3. Verifier le FBX rige dans un viewer 3D
-4. Tester dans FERRUS ANIMUS (input FBX rige → retargeting)
+1. Tester les FBX rigues dans FERRUS ANIMUS (retargeting)
+2. Valider le rendu visuel dans un viewer 3D
+3. Tester template Mixamo
 
 ---
 
-## Protocole de Test Rapide
+## Historique des Sessions
 
-```bash
-# 1. Prendre un avatar test en T-pose (ex: depuis Mixamo.com, download T-pose)
-# 2. Deposer dans IN/
-# 3. Lancer osseus_main.ipynb avec TEMPLATE="r15"
-# 4. Verifier :
-#    - rapport_osseus.json : status == "SUCCESS"
-#    - avatar_rigged_*.fbx : existe et taille > 100 Ko
-#    - Ouvrir le FBX dans Blender ou https://gltf-viewer.donmccurdy.com
-#    - Verifier que le squelette est visible et positionne dans le mesh
-```
-
----
-
-## Bugs Connus
-
-Aucun pour l'instant — pas encore teste en production.
+| Date | Evenement |
+|------|-----------|
+| 2026-04-24 | Creation de la fregate, livraison complete |
+| 2026-04-24 | Validation en production — 2/2 avatars GLB → FBX R15 OK |
 
 ---
 
