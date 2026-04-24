@@ -126,3 +126,40 @@ L'Empereur valide le pipeline quand :
 | Foot slide non corrige | Seuil trop eleve | Reduire seuil_cm dans plan_corrections.json |
 | Gimbal lock visible | Quaternion non force | Verifier retarget_r15.py forcer_quaternion = true |
 | Timeout Colab | Operation trop longue | Reduire intensite smooth_fcurves |
+
+
+---
+
+## VI. VALIDATION MODE MIXAMO (AJOUTE 2026-04-24)
+
+### Procedure
+
+```
+1. Rigger l'avatar sur mixamo.com (sans doigts)
+2. Telecharger en FBX "With Skin" (T-pose ou A-pose)
+3. Deposer le FBX avatar dans CORPUS IN_AVATAR/ (a venir)
+4. Dans main_ferrus.ipynb Cell 3 : RETARGET_MODE = "MIXAMO"
+5. Deposer les FBX DeepMotion dans IN/
+6. Executer les cellules 2 → 10
+7. Recuperer les FBX Mixamo dans OUT/
+```
+
+### Criteres de Succes Mode MIXAMO
+
+| CRITERE | VALEUR ATTENDUE |
+|---|---|
+| Bones output | 22 bones Mixamo presents dans l'armature |
+| Prefixe | `mixamorig:` present sur tous les bones |
+| Root bone | `mixamorig:Hips` est la racine |
+| Rotations | FCurves presentes sur les 22 bones |
+| Quaternion force | rotation_mode = QUATERNION sur tous les bones |
+| FBX importable | Import Blender sans erreur |
+| Frames | Meme nombre de frames que le FBX DeepMotion source |
+
+### Points de Vigilance MIXAMO
+
+| POINT | DESCRIPTION |
+|---|---|
+| Prefixe | Si l'avatar Mixamo exporte sans prefixe `mixamorig:`, les noms ne correspondront pas — verifier dans Blender |
+| Doigts | ANIMUS ne retargete pas les doigts (pas dans DeepMotion) — bones doigts Mixamo resteront neutres |
+| T-pose | Recommande T-pose pour le download Mixamo (meilleure qualite de pose repos) |
