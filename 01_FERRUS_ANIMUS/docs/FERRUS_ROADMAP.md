@@ -129,3 +129,27 @@ Phase 4 (Notebook) → must be done before Phase 5 (Validation)
 | Phase 3 — OUTPUT | 2-3h |
 | Phase 4 — Notebook | 1-2h |
 | Phase 5 — Validation | 1h |
+
+
+---
+
+## PHASE 6 — MODE MIXAMO (AJOUTE 2026-04-24)
+
+### 6.1 retarget_r15.py — mode MIXAMO
+- [x] Mapping DeepMotion 52 bones → Mixamo 22 bones
+- [x] Hierarchie Mixamo avec prefixe `mixamorig:`
+- [x] Detection automatique du prefixe (avec/sans `mixamorig:`)
+- [x] Rig Mixamo programmatique — ZERO fichier GLB
+- [x] Parametre `--mode MIXAMO` en CLI
+- [x] Parametre `mode="MIXAMO"` en module Python
+- [ ] Validation en production avec avatar rige Mixamo
+
+### 6.2 Notebook — selecteur RETARGET_MODE
+- [x] Variable `RETARGET_MODE = "R15"` dans Cell 3 CONFIG
+- [x] Passage `--mode RETARGET_MODE` dans Cell 9 OUTPUT
+- [x] Log dynamique (15 bones / 22 bones selon mode)
+- [ ] Test bout en bout mode MIXAMO
+
+### 6.3 CORPUS — adaptation mode MIXAMO
+- [ ] CORPUS : ajout support bones Mixamo (noms `mixamorig:*`)
+- [ ] CORPUS : selecteur RETARGET_MODE synchronise avec ANIMUS
