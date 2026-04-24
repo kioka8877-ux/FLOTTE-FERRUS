@@ -199,3 +199,49 @@ Les deux modes produisent le **meme contrat JSON** — le pipeline EXEC ne fait 
 4. Chaque operation EXEC independante — pas de chaine de dependances inter-ops
 5. plan_corrections.json = seul contrat entre INTEL et EXEC/OUTPUT
 6. Rotations forcees en quaternion au retargeting (prevenir gimbal lock)
+
+---
+## Mise a jour 2026-04-24 — Mode MIXAMO
+
+### 3.4 Modes de Retargeting OUTPUT (NOUVEAU)
+
+FERRUS ANIMUS supporte deux modes de retargeting, selectionnable dans le notebook :
+
+| MODE | CIBLE | BONES | USAGE |
+|------|-------|-------|-------|
+| `R15` | Roblox R15 | 15 bones | Pipeline Roblox natif (defaut) |
+| `MIXAMO` | Mixamo.com | 22 bones | Avatars custom riges par Mixamo |
+
+**Selecteur dans Cell 3 (CONFIG) du notebook :**
+```python
+RETARGET_MODE = "R15"   # ou "MIXAMO"
+```
+
+**Mapping DeepMotion → Mixamo (22 bones) :**
+
+| OS DEEPMOTION (_JNT) | OS MIXAMO | NOTE |
+|---|---|---|
+| hips_JNT | mixamorig:Hips | ROOT |
+| spine_JNT | mixamorig:Spine | |
+| spine1_JNT | mixamorig:Spine1 | |
+| spine2_JNT | mixamorig:Spine2 | |
+| neck_JNT | mixamorig:Neck | |
+| head_JNT | mixamorig:Head | |
+| l_shoulder_JNT | mixamorig:LeftShoulder | |
+| l_arm_JNT | mixamorig:LeftArm | |
+| l_forearm_JNT | mixamorig:LeftForeArm | |
+| l_hand_JNT | mixamorig:LeftHand | |
+| r_shoulder_JNT | mixamorig:RightShoulder | |
+| r_arm_JNT | mixamorig:RightArm | |
+| r_forearm_JNT | mixamorig:RightForeArm | |
+| r_hand_JNT | mixamorig:RightHand | |
+| l_upleg_JNT | mixamorig:LeftUpLeg | |
+| l_leg_JNT | mixamorig:LeftLeg | |
+| l_foot_JNT | mixamorig:LeftFoot | |
+| l_toebase_JNT | mixamorig:LeftToeBase | |
+| r_upleg_JNT | mixamorig:RightUpLeg | |
+| r_leg_JNT | mixamorig:RightLeg | |
+| r_foot_JNT | mixamorig:RightFoot | |
+| r_toebase_JNT | mixamorig:RightToeBase | |
+
+**Prefixe Mixamo :** par defaut `mixamorig:` (standard Mixamo FBX export).
