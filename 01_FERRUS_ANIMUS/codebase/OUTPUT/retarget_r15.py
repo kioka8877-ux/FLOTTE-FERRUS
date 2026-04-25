@@ -508,12 +508,20 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         bpy.data.objects.remove(dm_arm, do_unlink=True)
 
         # 6. Exporter : armature OSSEUS + meshes
+        # Definir le range scene pour que bake_anim couvre toute l'animation
+        scene.frame_start = frame_start
+        scene.frame_end   = frame_end
+        scene.frame_set(frame_start)
+
+        # Supprimer les cameras importees (ex: FERRUS_Camera de camera_follow)
+        for cam_obj in [o for o in scene.objects if o.type == "CAMERA"]:
+            bpy.data.objects.remove(cam_obj, do_unlink=True)
+
         bpy.ops.object.select_all(action="DESELECT")
         osseus_arm.select_set(True)
         for m in mesh_objects:
             m.select_set(True)
         bpy.context.view_layer.objects.active = osseus_arm
-        scene.frame_set(frame_start)
 
         os.makedirs(os.path.dirname(os.path.abspath(fbx_out)), exist_ok=True)
         bpy.ops.export_scene.fbx(
@@ -639,12 +647,16 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
             print("[retarget] AVERTISSEMENT : aucun mesh trouve dans l'avatar OSSEUS")
 
     # Export FBX : rig cible + meshes si disponibles
+    # Definir le range scene pour que bake_anim couvre toute l'animation
+    scene.frame_start = frame_start
+    scene.frame_end   = frame_end
+    scene.frame_set(frame_start)
+
     bpy.ops.object.select_all(action="DESELECT")
     target_arm.select_set(True)
     for m in mesh_objects:
         m.select_set(True)
     bpy.context.view_layer.objects.active = target_arm
-    scene.frame_set(frame_start)
 
     os.makedirs(os.path.dirname(os.path.abspath(fbx_out)), exist_ok=True)
     bpy.ops.export_scene.fbx(
