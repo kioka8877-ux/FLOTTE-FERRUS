@@ -254,25 +254,25 @@ REGLES D'ANALYSE OBLIGATOIRES :
 
 --- MAPPING R15 ---
 Le mapping DeepMotion → Roblox R15 attendu est :
-  hips_JNT      → LowerTorso (root)
-  spine2_JNT    → UpperTorso
-  head_JNT      → Head
-  l_arm_JNT     → LeftUpperArm
-  l_forearm_JNT → LeftLowerArm
-  l_hand_JNT    → LeftHand
-  r_arm_JNT     → RightUpperArm
-  r_forearm_JNT → RightLowerArm
-  r_hand_JNT    → RightHand
-  l_upleg_JNT   → LeftUpperLeg
-  l_leg_JNT     → LeftLowerLeg
-  l_foot_JNT    → LeftFoot
-  r_upleg_JNT   → RightUpperLeg
-  r_leg_JNT     → RightLowerLeg
-  r_foot_JNT    → RightFoot
+  Hip           → LowerTorso (root)
+  spine1_JNT    → UpperTorso
+  Head          → Head
+  LeftUpArm     → LeftUpperArm
+  LeftLowArm    → LeftLowerArm
+  LeftHand      → LeftHand
+  RightUpArm    → RightUpperArm
+  RightLowArm   → RightLowerArm
+  RightHand     → RightHand
+  LeftUpLeg     → LeftUpperLeg
+  LeftLowLeg    → LeftLowerLeg
+  LeftFoot      → LeftFoot
+  RightUpLeg    → RightUpperLeg
+  RightLowLeg   → RightLowerLeg
+  RightFoot     → RightFoot
 
 Os ignores (non requis par R15) :
-  l_shoulder_JNT, r_shoulder_JNT, l_toebase_JNT, r_toebase_JNT,
-  neck_JNT, tous les _handIndex/_handMiddle/_handRing/_handPinky/_handThumb
+  LeftCollar, RightCollar, Neck,
+  tous les doigts
 
 mapping_r15_valide = true si TOUS les 15 os cibles sont presents dans le squelette.
 
@@ -408,7 +408,7 @@ def run_intel_skeleton(fbx_files: list[str], output_dir: str) -> list[dict]:
   "metadata": {
     "fbx_version": "7.7",
     "taille_kb": 2959,
-    "convention_naming": "deepmotion_jnt",
+    "convention_naming": "custom",
     "t_pose_incluse": true,
     "base_model": "female-normal"
   },

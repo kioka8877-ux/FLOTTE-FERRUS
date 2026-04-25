@@ -8,22 +8,22 @@ MODES :
   R15        — retargeting vers Roblox R15 (15 bones)
   MIXAMO     — retargeting vers Mixamo (22 bones)
 
-Mapping DeepMotion → R15 (15 bones actifs, 37 ignores) :
-    hips_JNT      → LowerTorso   (ROOT)
-    spine2_JNT    → UpperTorso
-    head_JNT      → Head
-    l_arm_JNT     → LeftUpperArm
-    l_forearm_JNT → LeftLowerArm
-    l_hand_JNT    → LeftHand
-    r_arm_JNT     → RightUpperArm
-    r_forearm_JNT → RightLowerArm
-    r_hand_JNT    → RightHand
-    l_upleg_JNT   → LeftUpperLeg
-    l_leg_JNT     → LeftLowerLeg
-    l_foot_JNT    → LeftFoot
-    r_upleg_JNT   → RightUpperLeg
-    r_leg_JNT     → RightLowerLeg
-    r_foot_JNT    → RightFoot
+Mapping DeepMotion → R15 (15 bones actifs, convention custom) :
+    Hip           → LowerTorso   (ROOT)
+    spine1_JNT    → UpperTorso
+    Head          → Head
+    LeftUpArm     → LeftUpperArm
+    LeftLowArm    → LeftLowerArm
+    LeftHand      → LeftHand
+    RightUpArm    → RightUpperArm
+    RightLowArm   → RightLowerArm
+    RightHand     → RightHand
+    LeftUpLeg     → LeftUpperLeg
+    LeftLowLeg    → LeftLowerLeg
+    LeftFoot      → LeftFoot
+    RightUpLeg    → RightUpperLeg
+    RightLowLeg   → RightLowerLeg
+    RightFoot     → RightFoot
 
 Mapping DeepMotion → Mixamo (22 bones) :
     hips_JNT       → mixamorig:Hips  (ROOT)
@@ -73,21 +73,21 @@ import argparse
 # ══ Mapping et hierarchie R15 ══════════════════════════════════════════════════
 
 DM_TO_R15 = {
-    "hips_JNT":       "LowerTorso",
-    "spine2_JNT":     "UpperTorso",
-    "head_JNT":       "Head",
-    "l_arm_JNT":      "LeftUpperArm",
-    "l_forearm_JNT":  "LeftLowerArm",
-    "l_hand_JNT":     "LeftHand",
-    "r_arm_JNT":      "RightUpperArm",
-    "r_forearm_JNT":  "RightLowerArm",
-    "r_hand_JNT":     "RightHand",
-    "l_upleg_JNT":    "LeftUpperLeg",
-    "l_leg_JNT":      "LeftLowerLeg",
-    "l_foot_JNT":     "LeftFoot",
-    "r_upleg_JNT":    "RightUpperLeg",
-    "r_leg_JNT":      "RightLowerLeg",
-    "r_foot_JNT":     "RightFoot",
+    "Hip":          "LowerTorso",
+    "spine1_JNT":   "UpperTorso",
+    "Head":         "Head",
+    "LeftUpArm":    "LeftUpperArm",
+    "LeftLowArm":   "LeftLowerArm",
+    "LeftHand":     "LeftHand",
+    "RightUpArm":   "RightUpperArm",
+    "RightLowArm":  "RightLowerArm",
+    "RightHand":    "RightHand",
+    "LeftUpLeg":    "LeftUpperLeg",
+    "LeftLowLeg":   "LeftLowerLeg",
+    "LeftFoot":     "LeftFoot",
+    "RightUpLeg":   "RightUpperLeg",
+    "RightLowLeg":  "RightLowerLeg",
+    "RightFoot":    "RightFoot",
 }
 
 R15_HIERARCHY = {
@@ -109,7 +109,7 @@ R15_HIERARCHY = {
 }
 
 ROOT_BONE_R15 = "LowerTorso"
-ROOT_BONE_DM  = "hips_JNT"
+ROOT_BONE_DM  = "Hip"
 
 
 # ══ Mapping et hierarchie MIXAMO ═══════════════════════════════════════════════

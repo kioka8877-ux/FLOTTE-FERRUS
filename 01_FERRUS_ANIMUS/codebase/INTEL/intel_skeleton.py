@@ -88,25 +88,25 @@ REGLES D'ANALYSE OBLIGATOIRES :
 
 --- MAPPING R15 ---
 Le mapping DeepMotion -> Roblox R15 attendu est :
-  hips_JNT      -> LowerTorso (root)
-  spine2_JNT    -> UpperTorso
-  head_JNT      -> Head
-  l_arm_JNT     -> LeftUpperArm
-  l_forearm_JNT -> LeftLowerArm
-  l_hand_JNT    -> LeftHand
-  r_arm_JNT     -> RightUpperArm
-  r_forearm_JNT -> RightLowerArm
-  r_hand_JNT    -> RightHand
-  l_upleg_JNT   -> LeftUpperLeg
-  l_leg_JNT     -> LeftLowerLeg
-  l_foot_JNT    -> LeftFoot
-  r_upleg_JNT   -> RightUpperLeg
-  r_leg_JNT     -> RightLowerLeg
-  r_foot_JNT    -> RightFoot
+  Hip           -> LowerTorso (root)
+  spine1_JNT    -> UpperTorso
+  Head          -> Head
+  LeftUpArm     -> LeftUpperArm
+  LeftLowArm    -> LeftLowerArm
+  LeftHand      -> LeftHand
+  RightUpArm    -> RightUpperArm
+  RightLowArm   -> RightLowerArm
+  RightHand     -> RightHand
+  LeftUpLeg     -> LeftUpperLeg
+  LeftLowLeg    -> LeftLowerLeg
+  LeftFoot      -> LeftFoot
+  RightUpLeg    -> RightUpperLeg
+  RightLowLeg   -> RightLowerLeg
+  RightFoot     -> RightFoot
 
 Os ignores (non requis par R15) :
-  l_shoulder_JNT, r_shoulder_JNT, l_toebase_JNT, r_toebase_JNT,
-  neck_JNT, tous les _handIndex/_handMiddle/_handRing/_handPinky/_handThumb
+  LeftCollar, RightCollar, Neck,
+  tous les doigts
 
 mapping_r15_valide = true si TOUS les 15 os cibles sont presents dans le squelette.
 
@@ -208,12 +208,12 @@ def _static_fallback(fbx_path: str, fbx_xml: str) -> dict:
     jitter_score = float(root_el.findtext(".//jitter_global_score", "0.0"))
 
     foot_slide = root_el.findtext(".//foot_slide_detecte", "false") == "true"
-    gauche = float(root_el.findtext('.//foot[@bone="l_foot_JNT"][@delta_cm]', "0") or
-                   (root_el.find('.//foot[@bone="l_foot_JNT"]').get("delta_cm", "0")
-                    if root_el.find('.//foot[@bone="l_foot_JNT"]') is not None else "0"))
-    droite = float(root_el.findtext('.//foot[@bone="r_foot_JNT"][@delta_cm]', "0") or
-                   (root_el.find('.//foot[@bone="r_foot_JNT"]').get("delta_cm", "0")
-                    if root_el.find('.//foot[@bone="r_foot_JNT"]') is not None else "0"))
+    gauche = float(root_el.findtext('.//foot[@bone="LeftFoot"][@delta_cm]', "0") or
+                   (root_el.find('.//foot[@bone="LeftFoot"]').get("delta_cm", "0")
+                    if root_el.find('.//foot[@bone="LeftFoot"]') is not None else "0"))
+    droite = float(root_el.findtext('.//foot[@bone="RightFoot"][@delta_cm]', "0") or
+                   (root_el.find('.//foot[@bone="RightFoot"]').get("delta_cm", "0")
+                    if root_el.find('.//foot[@bone="RightFoot"]') is not None else "0"))
 
     derive = root_el.findtext(".//derive_hanches_detectee", "false") == "true"
     derive_el = root_el.find(".//derive_hanches")
@@ -235,12 +235,12 @@ def _static_fallback(fbx_path: str, fbx_xml: str) -> dict:
         "metadata": {
             "fbx_version": "7.7",
             "taille_kb": taille_kb,
-            "convention_naming": "deepmotion_jnt",
+            "convention_naming": "custom",
             "t_pose_incluse": True,
             "base_model": "inconnu",
         },
         "squelette": {
-            "root_bone": "hips_JNT",
+            "root_bone": "Hip",
             "total_bones": total_bones,
             "bones_core": max(0, total_bones - 30),
             "bones_doigts": 30 if total_bones >= 52 else 0,

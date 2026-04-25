@@ -68,8 +68,8 @@ def extract_fbx_metadata(fbx_path: str) -> str:
         jitter_bones = []
         jitter_scores = {}
         JITTER_BONES_CIBLES = [
-            "l_hand_JNT", "r_hand_JNT", "head_JNT",
-            "l_forearm_JNT", "r_forearm_JNT"
+            "LeftHand", "RightHand", "Head",
+            "LeftLowArm", "RightLowArm"
         ]
 
         for bone_name in JITTER_BONES_CIBLES:
@@ -96,7 +96,7 @@ def extract_fbx_metadata(fbx_path: str) -> str:
         )
 
         # --- Detection foot slide ---
-        foot_bones = {"l_foot_JNT": "pied_gauche", "r_foot_JNT": "pied_droit"}
+        foot_bones = {"LeftFoot": "pied_gauche", "RightFoot": "pied_droit"}
         foot_slide_data = {}
         for bone_name, label in foot_bones.items():
             bone_loc = [
@@ -115,7 +115,7 @@ def extract_fbx_metadata(fbx_path: str) -> str:
         # --- Detection derive hanches ---
         hip_fc = [
             fc for fc in action.fcurves
-            if "hips_JNT" in fc.data_path
+            if "Hip" in fc.data_path
             and "location" in fc.data_path
             and fc.array_index == 1
         ]
@@ -184,9 +184,9 @@ def extract_fbx_metadata(fbx_path: str) -> str:
   <source>{os.path.basename(fbx_path)}</source>
   <fbx_version>7.7</fbx_version>
   <taille_kb>{file_size_kb}</taille_kb>
-  <convention_naming>deepmotion_jnt</convention_naming>
+  <convention_naming>custom</convention_naming>
   <squelette>
-    <root_bone>hips_JNT</root_bone>
+    <root_bone>Hip</root_bone>
     <total_bones>{len(bones)}</total_bones>
     <bones>
 {chr(10).join(bone_lines)}
