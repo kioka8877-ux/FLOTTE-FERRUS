@@ -24,9 +24,9 @@ Principe :
   L'animation camera est bakee en keyframes pour une compatibilite FBX maximale.
 
 Usage standalone (bpy headless) :
-    blender --background --python camera_follow.py -- \\
-        --fbx-in  path/to/input.fbx \\
-        --plan    path/to/plan_corrections.json \\
+    blender --background --python camera_follow.py -- \
+        --fbx-in  path/to/input.fbx \
+        --plan    path/to/plan_corrections.json \
         --fbx-out path/to/output.fbx
 
 Usage module (appele par le notebook Colab) :
@@ -41,35 +41,59 @@ import argparse
 from math import exp
 
 
+# ══ Candidats pour le bone de hanche (detection dynamique) ════════════════════
+
+HIP_BONE_CANDIDATES = [
+    "hips_JNT", "Hips", "Hip", "hips", "hip",
+    "pelvis_JNT", "Pelvis", "pelvis",
+    "spine_JNT", "Spine", "spine",
+    "mixamorig:Hips", "mixamorig:Spine",
+]
+
+
+def _find_hip_bone(armature) -> str | None:
+    """
+    Detecte dynamiquement le bone de hanche en testant les candidats connus.
+    Retourne le nom du premier bone trouve dans l'armature, ou None.
+    """
+    bone_names = {b.name for b in armature.pose.bones}
+    for candidate in HIP_BONE_CANDIDATES:
+        if candidate in bone_names:
+            print(f"[camera_follow] Hip bone detecte : '{candidate}'")
+            return candidate
+    # Fallback : chercher par substring case-insensitive
+    for name in bone_names:
+        if any(k in name.lower() for k in ("hip", "pelvi", "hips")):
+            print(f"[camera_follow] Hip bone detecte (fallback) : '{name}'")
+            return name
+    return None
+
+
 # ══ Constantes ════════════════════════════════════════════════════════════════
 
-HIP_BONE        = "hips_JNT"
 CAMERA_DISTANCE = 3.0   # unites Blender (~ metres) devant le personnage (axe Y monde)
-CAMERA_HEIGHT   = 0.5   # unites au-dessus de hips_JNT.Z (cadrage torse/tete)
-TARGET_HEIGHT   = 0.3   # unites au-dessus de hips_JNT.Z pour le point de vise
+CAMERA_HEIGHT   = 0.5   # unites au-dessus de hip_bone.Z (cadrage torse/tete)
+TARGET_HEIGHT   = 0.3   # unites au-dessus de hip_bone.Z pour le point de vise
 SMOOTH_KERNEL   = 11    # taille noyau gaussien pour smooth_follow
 SMOOTH_SIGMA    = 3.0   # sigma gaussien pour smooth_follow
 
 
-# ══ Extraction des positions monde de hips_JNT ════════════════════════════════
+# ══ Extraction des positions monde du bone de hanche ══════════════════════════
 
-def _get_hip_world_positions(scene, armature) -> dict:
+def _get_hip_world_positions(scene, armature, hip_bone: str) -> dict:
     """
     Evalue la pose a chaque frame de l'action et retourne les positions monde
-    du bone hips_JNT en espace Blender Z-up.
-
-    Utilise scene.frame_set() + matrix_world @ pose_bone.head pour obtenir
-    les coordonnees monde correctes, quelle que soit la transformation de l'armature.
+    du bone de hanche en espace Blender Z-up.
 
     Returns:
         dict {frame_int: (x, y, z)} en espace monde Blender
-        Vide si hips_JNT est introuvable ou si aucune animation n'est presente.
+        Vide si le bone est introuvable ou si aucune animation n'est presente.
     """
     action = armature.animation_data.action if armature.animation_data else None
     if not action:
         return {}
 
-    if HIP_BONE not in armature.pose.bones:
+    if hip_bone not in armature.pose.bones:
         return {}
 
     frame_start = int(action.frame_range[0])
@@ -82,7 +106,7 @@ def _get_hip_world_positions(scene, armature) -> dict:
         if bpy_module:
             bpy_module.context.view_layer.update()
 
-        bone      = armature.pose.bones[HIP_BONE]
+        bone      = armature.pose.bones[hip_bone]
         world_pos = armature.matrix_world @ bone.head
         positions[frame] = (world_pos.x, world_pos.y, world_pos.z)
 
@@ -141,7 +165,7 @@ def _build_static_trajectory(frames, xs, ys, zs):
     mean_z = sum(zs) / len(zs)
 
     cam_x = mean_x
-    cam_y = mean_y - CAMERA_DISTANCE  # en avant du personnage (Y negatif = devant)
+    cam_y = mean_y - CAMERA_DISTANCE
     cam_z = mean_z + CAMERA_HEIGHT
 
     tgt_x = mean_x
@@ -186,8 +210,6 @@ def _build_smooth_follow_trajectory(frames, xs, ys, zs):
     cam_ys = [y - CAMERA_DISTANCE for y in ys_s]
     cam_zs = [z + CAMERA_HEIGHT   for z in zs_s]
 
-    # La camera suit les hanches lissees, mais vise les hanches reelles
-    # — cree un effet de regard "anticipe" naturel
     tgt_xs = list(xs)
     tgt_ys = list(ys)
     tgt_zs = [z + TARGET_HEIGHT for z in zs]
@@ -223,12 +245,10 @@ def _create_and_animate_camera(scene, frames,
 
         direction = (tgt_pos - cam_pos)
         if direction.length < 1e-6:
-            direction = Vector((0.0, 1.0, 0.0))  # fallback : regarde vers +Y
+            direction = Vector((0.0, 1.0, 0.0))
         else:
             direction.normalize()
 
-        # to_track_quat('-Z', 'Y') : fait pointer l'axe -Z local vers direction,
-        # avec Y local comme axe haut — convention camera Blender standard
         rot = direction.to_track_quat("-Z", "Y")
         cam_obj.location       = cam_pos
         cam_obj.rotation_euler = rot.to_euler("XYZ")
@@ -306,21 +326,27 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
     if not armature.animation_data or not armature.animation_data.action:
         raise RuntimeError("[camera_follow] Aucune animation dans l'armature")
 
-    if HIP_BONE not in armature.pose.bones:
-        raise RuntimeError(f"[camera_follow] Bone '{HIP_BONE}' introuvable dans l'armature")
+    # Detection dynamique du bone de hanche
+    hip_bone = _find_hip_bone(armature)
+    if not hip_bone:
+        bone_list = [b.name for b in armature.pose.bones]
+        raise RuntimeError(
+            f"[camera_follow] Aucun bone de hanche trouve. "
+            f"Bones disponibles : {bone_list}"
+        )
 
     scene = bpy.context.scene
 
-    # Extraire les positions monde de hips_JNT frame par frame
-    print(f"[camera_follow] Extraction des positions monde de {HIP_BONE}...")
-    hip_positions = _get_hip_world_positions(scene, armature)
+    # Extraire les positions monde du bone de hanche frame par frame
+    print(f"[camera_follow] Extraction des positions monde de '{hip_bone}'...")
+    hip_positions = _get_hip_world_positions(scene, armature, hip_bone)
 
     if not hip_positions:
-        raise RuntimeError(f"[camera_follow] Impossible d'extraire les positions de {HIP_BONE}")
+        raise RuntimeError(f"[camera_follow] Impossible d'extraire les positions de '{hip_bone}'")
 
     frames, xs, ys, zs = _unpack_positions(hip_positions)
     print(f"[camera_follow] {len(frames)} frames extraites "
-          f"(frame {frames[0]} → {frames[-1]})")
+          f"(frame {frames[0]} -> {frames[-1]})")
 
     # Construire la trajectoire camera
     if type_suivi == "static":
@@ -357,6 +383,12 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
         bake_anim_force_startend_keying=True,
         add_leaf_bones=False,
     )
+
+    # Verification que le fichier a bien ete ecrit
+    if not os.path.exists(fbx_out):
+        raise RuntimeError(
+            f"[camera_follow] Export FBX echoue silencieusement — fichier absent : {fbx_out}"
+        )
 
     print(f"[camera_follow] FBX exporte avec camera : {fbx_out}")
 
