@@ -477,12 +477,11 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         # Parametres d'import FBX uniformes — garantit le meme espace de coordonnees
         # pour OSSEUS et DeepMotion, evite le mismatch d'axes (bug "Superman / vole").
+        # Blender 4.2 : apply_unit_scale et use_manual_orientation supprimes de l'API
         FBX_IMPORT_PARAMS = dict(
             axis_forward="-Z",
             axis_up="Y",
-            use_manual_orientation=False,
             global_scale=1.0,
-            apply_unit_scale=True,
             use_anim=True,
         )
 
@@ -652,14 +651,13 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         print("[retarget] AVERTISSEMENT : t_pose_incluse=false (derive possible sur certains bones)")
 
     # Charger le FBX corrige — memes parametres d'axes que le mode DEEPMOTION
+    # Blender 4.2 : apply_unit_scale et use_manual_orientation supprimes de l'API
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.fbx(
         filepath=os.path.abspath(fbx_in),
         axis_forward="-Z",
         axis_up="Y",
-        use_manual_orientation=False,
         global_scale=1.0,
-        apply_unit_scale=True,
         use_anim=True,
     )
 
