@@ -90,6 +90,32 @@ DM_TO_R15 = {
     "RightFoot":    "RightFoot",
 }
 
+# ══ Mapping DeepMotion → OSSEUS (mode transfert direct 52 bones) ══════════════
+# DeepMotion utilise une convention mixte (noms courts pour le corps, _JNT pour doigts)
+# OSSEUS genere tous les bones avec le suffixe _JNT.
+# Les bones deja identiques (doigts, spine_JNT, spine1_JNT, toebases) ne sont pas listes.
+
+DM_TO_OSSEUS = {
+    "Hip":         "hips_JNT",
+    "Chest":       "spine2_JNT",
+    "Neck":        "neck_JNT",
+    "Head":        "head_JNT",
+    "LeftCollar":  "l_shoulder_JNT",
+    "LeftUpArm":   "l_arm_JNT",
+    "LeftLowArm":  "l_forearm_JNT",
+    "LeftHand":    "l_hand_JNT",
+    "LeftUpLeg":   "l_upleg_JNT",
+    "LeftLowLeg":  "l_leg_JNT",
+    "LeftFoot":    "l_foot_JNT",
+    "RightCollar": "r_shoulder_JNT",
+    "RightUpArm":  "r_arm_JNT",
+    "RightLowArm": "r_forearm_JNT",
+    "RightHand":   "r_hand_JNT",
+    "RightUpLeg":  "r_upleg_JNT",
+    "RightLowLeg": "r_leg_JNT",
+    "RightFoot":   "r_foot_JNT",
+}
+
 R15_HIERARCHY = {
     "LowerTorso":    None,
     "UpperTorso":    "LowerTorso",
@@ -499,9 +525,20 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
 
-        # 4. Bake frame-par-frame DeepMotion → OSSEUS (memes noms de bones)
-        # NOTE: copie directe de FCurves ne suffit pas — bake_anim Blender evalue
-        # le dependency graph, pas les FCurves Python. keyframe_insert() obligatoire.
+        # 4. Bake frame-par-frame DeepMotion → OSSEUS
+        # Le mapping DM_TO_OSSEUS traduit les noms courts DeepMotion vers les noms _JNT d'OSSEUS.
+        # Les bones avec noms identiques (doigts, spine_JNT, etc.) sont passes directement.
+        print("[retarget] Construction du mapping DM → OSSEUS...")
+
+        # Construire la table de lookup : osseus_name → dm_name
+        osseus_to_dm = {v: k for k, v in DM_TO_OSSEUS.items()}
+        dm_bone_set = {b.name for b in dm_arm.data.bones}
+        for bn in dm_bone_set:
+            if bn not in osseus_to_dm.values() and bn not in {v for v in DM_TO_OSSEUS.keys()}:
+                # Bone DM dont le nom existe tel quel dans OSSEUS (doigts, spine_JNT, etc.)
+                osseus_to_dm.setdefault(bn, bn)
+
+        print(f"[retarget] Bones mappes : {len(osseus_to_dm)}")
         print("[retarget] Bake frame-par-frame DeepMotion → OSSEUS...")
 
         for pb in osseus_arm.pose.bones:
@@ -516,10 +553,11 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
             bpy.context.view_layer.update()
 
             for pb in osseus_arm.pose.bones:
-                dm_pb = dm_arm.pose.bones.get(pb.name)
+                dm_name = osseus_to_dm.get(pb.name, pb.name)
+                dm_pb = dm_arm.pose.bones.get(dm_name)
                 if dm_pb is None:
                     continue
-                pb.rotation_quaternion = dm_pb.matrix_basis.to_quaternion()
+                pb.rotation_quaternion = dm_pb.matrix_basis.to_3x3().to_quaternion()
                 pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
                 if pb.parent is None:  # Root bone : location aussi
                     pb.location = dm_pb.matrix_basis.translation.copy()
