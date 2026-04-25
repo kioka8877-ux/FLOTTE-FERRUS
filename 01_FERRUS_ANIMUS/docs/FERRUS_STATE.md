@@ -4,7 +4,7 @@
 
 ---
 
-[STATUS] : EN REFACTORISATION — Reconstruction architecturale complete suite a corruption detectee
+[STATUS] : REFACTORISATION COMPLETE — En attente de validation en production
 
 [LAST_WORK] :
 - Brainstorming de fondation complete (Codex Mechanicus Tome I valide)
@@ -25,10 +25,20 @@
   → Brainstorming architectural complet execute
   → Decision : refactorisation complete selon nouvelle vision
 - SESSION 2026-04-24 (soir) : mise a jour docs de suivi (PRD v2, ROADMAP Phase 7, VALIDATION Section VII)
+- SESSION 2026-04-25 : REFACTORISATION CODE COMPLETE
+  → mask_limbs.py : confirme deja refactorise (per-frame freeze operationnel)
+  → retarget_r15.py : mode DEEPMOTION ajoute (52→52 + copy directe FCurves + mesh obligatoire)
+  → retarget_r15.py : injection mesh OSSEUS pour R15 et MIXAMO via --avatar-fbx (_import_osseus_meshes)
+  → retarget_r15.py : --avatar-fbx ajoute au CLI (requis DEEPMOTION, optionnel R15/MIXAMO)
+  → main_ferrus.ipynb Cell 2 : IN_AVATAR_DIR cree et initialise au montage
+  → main_ferrus.ipynb Cell 3 : RETARGET_MODE → BONES_MODE, options DEEPMOTION/R15/MIXAMO
+  → main_ferrus.ipynb Cell 4 : scan IN_AVATAR/, matching alphabetique, avatar_fbx dans manifest
+  → main_ferrus.ipynb Cell 9 : --avatar-fbx et --mode BONES_MODE passes a retarget, affichage mesh
+  → Dossier IN_AVATAR/ cree avec .gitkeep
 
-[NEXT_TASK] : Refactorisation mask_limbs.py (per-frame freeze)
+[NEXT_TASK] : Validation en production — test bout en bout mode DEEPMOTION
 
-[STATUS] : PRET_POUR_REFACTORISATION
+[STATUS] : PRET_POUR_VALIDATION
 
 [BLOCKERS] : Aucun
 
@@ -52,10 +62,11 @@
 | EXEC | stabilize_hips.py | TERMINE — pas de modification requise |
 | EXEC | remove_foot_slide.py | TERMINE — pas de modification requise |
 | EXEC | camera_follow.py | TERMINE — pas de modification requise |
-| EXEC | mask_limbs.py | EN REFACTORISATION — per-frame freeze |
-| OUTPUT | retarget_r15.py | EN REFACTORISATION — ajout mode DEEPMOTION + mesh injection |
-| PIPELINE | main_ferrus.ipynb | EN REFACTORISATION — Cells 2/3/4/9 |
-| DOCS | FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md | EN REFACTORISATION — plages frames |
+| EXEC | mask_limbs.py | TERMINE — per-frame freeze operationnel |
+| OUTPUT | retarget_r15.py | TERMINE — DEEPMOTION + mesh injection + CLI --avatar-fbx |
+| PIPELINE | main_ferrus.ipynb | TERMINE — Cells 2/3/4/9 refactorisees |
+| DOCS | FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md | TERMINE — plages frames v2.0 |
+| INFRA | IN_AVATAR/ | TERMINE — dossier cree avec .gitkeep |
 
 ---
 

@@ -157,18 +157,22 @@ Declenchee le 2026-04-24 suite a detection du bug de conception.
 - [x] FERRUS_VALIDATION.md mis a jour (Section VII)
 - [x] FERRUS_INTEL_VISION_GEMINI_METAPROMPT.md mis a jour (plages frames)
 
-### 7.2 Code — EXEC (A FAIRE)
-- [ ] mask_limbs.py : per-frame freeze (Option A)
+### 7.2 Code — EXEC (TERMINE)
+- [x] mask_limbs.py : per-frame freeze (Option A) — confirme operationnel
 
-### 7.3 Code — OUTPUT (A FAIRE)
-- [ ] retarget_r15.py : mode DEEPMOTION (52->52 + mesh)
-- [ ] retarget_r15.py : injection mesh R15/Mixamo via --avatar-fbx
+### 7.3 Code — OUTPUT (TERMINE)
+- [x] retarget_r15.py : mode DEEPMOTION (52->52, copy directe FCurves, mesh obligatoire)
+- [x] retarget_r15.py : injection mesh OSSEUS R15/Mixamo via --avatar-fbx
+- [x] retarget_r15.py : CLI --avatar-fbx ajoute (requis DEEPMOTION, optionnel R15/MIXAMO)
 
-### 7.4 Code — Notebook (A FAIRE)
-- [ ] main_ferrus.ipynb : Cells 2/3/4/9
+### 7.4 Code — Notebook (TERMINE)
+- [x] main_ferrus.ipynb Cell 2 : IN_AVATAR_DIR cree et expose dans SETUP
+- [x] main_ferrus.ipynb Cell 3 : RETARGET_MODE → BONES_MODE, 3 options documentees
+- [x] main_ferrus.ipynb Cell 4 : scan IN_AVATAR/, matching alphabetique, avatar_fbx dans manifest
+- [x] main_ferrus.ipynb Cell 9 : --avatar-fbx + --mode BONES_MODE, affichage mesh_present
 
-### 7.5 Infrastructure (A FAIRE)
-- [ ] Creer dossier IN_AVATAR/ avec .gitkeep
+### 7.5 Infrastructure (TERMINE)
+- [x] Dossier IN_AVATAR/ cree avec .gitkeep
 
 ---
 

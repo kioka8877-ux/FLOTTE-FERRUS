@@ -1,10 +1,12 @@
 """
 retarget_r15.py — FERRUS ANIMUS / Compartiment OUTPUT
-Retargeting DeepMotion (52 bones) vers Roblox R15 (15 bones) OU Mixamo (22 bones).
+Retargeting DeepMotion (52 bones) vers R15 (15 bones), Mixamo (22 bones),
+ou transfert direct DeepMotion (52 bones → 52 bones avec mesh OSSEUS).
 
 MODES :
-  R15    — retargeting vers Roblox R15 (15 bones) — DEFAULT — pipeline Roblox natif
-  MIXAMO — retargeting vers Mixamo (22 bones) — pour avatars riges par Mixamo.com
+  DEEPMOTION — transfert direct FCurves (memes noms de bones) + mesh OSSEUS obligatoire
+  R15        — retargeting vers Roblox R15 (15 bones)
+  MIXAMO     — retargeting vers Mixamo (22 bones)
 
 Mapping DeepMotion → R15 (15 bones actifs, 37 ignores) :
     hips_JNT      → LowerTorso   (ROOT)
@@ -49,14 +51,15 @@ Mapping DeepMotion → Mixamo (22 bones) :
 
 Usage standalone (bpy headless) :
     blender --background --python retarget_r15.py -- \
-        --fbx-in  path/to/input_corrige.fbx \
-        --plan    path/to/plan_corrections.json \
-        --fbx-out path/to/ferrus_out.fbx \
-        --mode    R15   (ou MIXAMO — defaut: R15)
+        --fbx-in     path/to/input_corrige.fbx \
+        --plan       path/to/plan_corrections.json \
+        --fbx-out    path/to/ferrus_out.fbx \
+        --mode       DEEPMOTION   (ou R15 ou MIXAMO — defaut: R15) \
+        --avatar-fbx path/to/osseus_avatar.fbx   (requis pour DEEPMOTION, optionnel pour R15/MIXAMO)
 
 Usage module (appele par le notebook Colab) :
     from retarget_r15 import run
-    result = run(fbx_in, plan_path, fbx_out, mode="R15")
+    result = run(fbx_in, plan_path, fbx_out, mode="DEEPMOTION", avatar_fbx="osseus.fbx")
 
 POUR L'EMPEROR. POUR LA FLOTTE FERRUS.
 """
@@ -181,31 +184,6 @@ def _build_mixamo_mapping(prefix: str) -> tuple[dict, dict, str]:
     return dm_to_mixamo, mixamo_hier, root_mixamo
 
 
-# ══ Detection du prefixe Mixamo ═══════════════════════════════════════════════
-
-def _detect_mixamo_prefix_from_fbx(fbx_path: str) -> str:
-    """
-    Inspecte les noms de bones d'un FBX via bpy pour determiner
-    si le prefixe 'mixamorig:' est present ou non.
-    """
-    import bpy
-
-    # Charger temporairement pour detecter le prefixe
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_path))
-
-    for obj in bpy.context.scene.objects:
-        if obj.type == "ARMATURE":
-            bone_names = {b.name for b in obj.data.bones}
-            if f"{MIXAMO_PREFIX}Hips" in bone_names:
-                return MIXAMO_PREFIX
-            if "Hips" in bone_names:
-                return ""
-            break
-
-    return MIXAMO_PREFIX  # fallback : prefixe standard
-
-
 # ══ Extraction de la pose repos de DeepMotion ═════════════════════════════════
 
 def _extract_rest_pose(dm_armature) -> dict:
@@ -320,6 +298,95 @@ def _transfer_animation(scene, dm_armature, target_armature,
     return frames_done
 
 
+# ══ Mode DEEPMOTION — copy directe FCurves ════════════════════════════════════
+
+def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
+    """
+    Copie les FCurves de l'action DeepMotion vers une nouvelle action
+    sur l'armature OSSEUS. Fonctionne car les bones ont exactement les
+    memes noms dans les deux squelettes (52 bones DeepMotion).
+
+    Force les rotations en quaternion sur tous les bones OSSEUS.
+
+    Returns:
+        Nombre de FCurves copiees.
+    """
+    import bpy
+
+    # Forcer quaternion sur tous les bones OSSEUS
+    for pb in osseus_arm.pose.bones:
+        pb.rotation_mode = "QUATERNION"
+
+    osseus_bone_names = {b.name for b in osseus_arm.data.bones}
+
+    new_action = bpy.data.actions.new(name="DEEPMOTION_Animation")
+    osseus_arm.animation_data_create()
+    osseus_arm.animation_data.action = new_action
+
+    copied = 0
+    for fc in dm_action.fcurves:
+        # Trouver le bone reference dans le data_path
+        # Format : 'pose.bones["bone_name"].rotation_quaternion'
+        bone_name = None
+        for bn in osseus_bone_names:
+            if f'"{bn}"' in fc.data_path:
+                bone_name = bn
+                break
+
+        if bone_name is None:
+            continue  # FCurve ne correspond a aucun bone OSSEUS
+
+        new_fc = new_action.fcurves.new(
+            data_path=fc.data_path,
+            index=fc.array_index,
+        )
+        new_fc.keyframe_points.add(len(fc.keyframe_points))
+        for i, kp in enumerate(fc.keyframe_points):
+            new_fc.keyframe_points[i].co           = kp.co
+            new_fc.keyframe_points[i].interpolation = kp.interpolation
+            new_fc.keyframe_points[i].handle_left   = kp.handle_left
+            new_fc.keyframe_points[i].handle_right  = kp.handle_right
+        new_fc.update()
+        copied += 1
+
+    return copied
+
+
+# ══ Injection mesh OSSEUS (R15 / MIXAMO) ══════════════════════════════════════
+
+def _import_osseus_meshes(avatar_fbx: str, scene) -> list:
+    """
+    Importe le FBX OSSEUS dans la scene courante et retourne la liste
+    des objets MESH importes (l'armature OSSEUS n'est pas retournee).
+
+    L'avatar OSSEUS est lu en lecture seule — il n'est jamais modifie.
+    Les meshes sont lies au rig cible uniquement a l'export.
+    """
+    import bpy
+
+    # Snapshot des objets existants avant import
+    existing = set(bpy.context.scene.objects)
+
+    bpy.ops.import_scene.fbx(filepath=os.path.abspath(avatar_fbx))
+
+    # Identifier les nouveaux objets
+    imported = set(bpy.context.scene.objects) - existing
+
+    # Recuperer les armatures importees (a supprimer — on veut uniquement les meshes)
+    osseus_arms  = [o for o in imported if o.type == "ARMATURE"]
+    osseus_meshes = [o for o in imported if o.type == "MESH"]
+
+    # Supprimer l'armature OSSEUS importee (on garde uniquement les meshes)
+    for arm in osseus_arms:
+        bpy.data.objects.remove(arm, do_unlink=True)
+
+    print(f"[retarget] Meshes OSSEUS importes : {len(osseus_meshes)}")
+    for m in osseus_meshes:
+        print(f"  mesh : {m.name}")
+
+    return osseus_meshes
+
+
 # ══ Chargement du plan ════════════════════════════════════════════════════════
 
 def _load_retarget_params(plan_path: str) -> dict | None:
@@ -340,15 +407,18 @@ def _load_retarget_params(plan_path: str) -> dict | None:
 
 # ══ Fonction principale ═══════════════════════════════════════════════════════
 
-def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
+def run(fbx_in: str, plan_path: str, fbx_out: str,
+        mode: str = "R15", avatar_fbx: str | None = None) -> dict:
     """
-    Retargete le FBX DeepMotion corrige vers R15 ou Mixamo.
+    Retargete le FBX DeepMotion corrige vers R15, Mixamo ou DEEPMOTION.
 
     Args:
-        fbx_in    : chemin vers le FBX source (sortie compartiment EXEC)
-        plan_path : chemin vers plan_corrections.json
-        fbx_out   : chemin vers le FBX de sortie
-        mode      : "R15" (defaut) ou "MIXAMO"
+        fbx_in     : chemin vers le FBX source (sortie compartiment EXEC)
+        plan_path  : chemin vers plan_corrections.json
+        fbx_out    : chemin vers le FBX de sortie
+        mode       : "R15" (defaut), "MIXAMO" ou "DEEPMOTION"
+        avatar_fbx : chemin vers le FBX OSSEUS (requis pour DEEPMOTION,
+                     optionnel pour R15/MIXAMO — si fourni, le mesh est inclus dans l'output)
 
     Returns:
         dict de rapport {status, mode, bones_retargetes, frames_transferees, ...}
@@ -356,8 +426,11 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
     import bpy
 
     mode = mode.upper()
-    if mode not in ("R15", "MIXAMO"):
-        raise ValueError(f"[retarget] Mode invalide : '{mode}'. Valeurs : R15, MIXAMO")
+    if mode not in ("R15", "MIXAMO", "DEEPMOTION"):
+        raise ValueError(f"[retarget] Mode invalide : '{mode}'. Valeurs : R15, MIXAMO, DEEPMOTION")
+
+    if mode == "DEEPMOTION" and not avatar_fbx:
+        raise ValueError("[retarget] Mode DEEPMOTION : --avatar-fbx est obligatoire")
 
     params = _load_retarget_params(plan_path)
     if params is None:
@@ -367,8 +440,111 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
         return {"status": "skipped", "mode": mode, "raison": "enabled=false"}
 
     t_pose = params["t_pose_disponible"]
-
     print(f"[retarget] === FERRUS ANIMUS — MODE {mode} ===")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # MODE DEEPMOTION — transfert direct FCurves (meme squelette 52 bones)
+    # ═══════════════════════════════════════════════════════════════════════════
+    if mode == "DEEPMOTION":
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        scene = bpy.context.scene
+
+        # 1. Charger l'avatar OSSEUS (mesh + squelette T-pose)
+        print(f"[retarget] Chargement OSSEUS : {avatar_fbx}")
+        bpy.ops.import_scene.fbx(filepath=os.path.abspath(avatar_fbx))
+
+        osseus_arm = next((o for o in scene.objects if o.type == "ARMATURE"), None)
+        if not osseus_arm:
+            raise RuntimeError(f"[retarget] Aucune armature dans l'avatar OSSEUS : {avatar_fbx}")
+
+        mesh_objects = [o for o in scene.objects if o.type == "MESH"]
+        print(f"[retarget] OSSEUS : armature '{osseus_arm.name}', "
+              f"{len(osseus_arm.data.bones)} bones, "
+              f"{len(mesh_objects)} mesh(es)")
+
+        # 2. Charger le FBX DeepMotion corrige (animation)
+        print(f"[retarget] Chargement DeepMotion : {fbx_in}")
+        existing_before = set(scene.objects)
+        bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_in))
+
+        dm_arm = next(
+            (o for o in scene.objects if o.type == "ARMATURE" and o != osseus_arm),
+            None
+        )
+        if not dm_arm:
+            raise RuntimeError(
+                f"[retarget] Armature DeepMotion introuvable apres import de {fbx_in}"
+            )
+
+        dm_action = dm_arm.animation_data.action if dm_arm.animation_data else None
+        if not dm_action:
+            raise RuntimeError("[retarget] Aucune animation dans l'armature DeepMotion")
+
+        frame_start = int(dm_action.frame_range[0])
+        frame_end   = int(dm_action.frame_range[1])
+        nb_frames   = frame_end - frame_start + 1
+
+        print(f"[retarget] DeepMotion : {len(dm_arm.data.bones)} bones, "
+              f"frames {frame_start}→{frame_end} ({nb_frames} frames)")
+
+        # 3. Verifier la correspondance des bones
+        osseus_bones = {b.name for b in osseus_arm.data.bones}
+        dm_bones     = {b.name for b in dm_arm.data.bones}
+        communs      = osseus_bones & dm_bones
+        absents_osseus = dm_bones - osseus_bones
+
+        if absents_osseus:
+            print(f"[retarget] {len(absents_osseus)} bones DeepMotion absents dans OSSEUS "
+                  f"(FCurves ignorees) : {sorted(absents_osseus)[:5]}{'...' if len(absents_osseus) > 5 else ''}")
+
+        print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
+
+        # 4. Copier les FCurves directement sur l'armature OSSEUS
+        print("[retarget] Copie directe des FCurves DeepMotion → OSSEUS...")
+        fcurves_copies = _copy_fcurves_direct(dm_action, osseus_arm)
+        print(f"[retarget] FCurves copiees : {fcurves_copies}")
+
+        # 5. Supprimer l'armature DeepMotion (plus necessaire)
+        bpy.data.objects.remove(dm_arm, do_unlink=True)
+
+        # 6. Exporter : armature OSSEUS + meshes
+        bpy.ops.object.select_all(action="DESELECT")
+        osseus_arm.select_set(True)
+        for m in mesh_objects:
+            m.select_set(True)
+        bpy.context.view_layer.objects.active = osseus_arm
+        scene.frame_set(frame_start)
+
+        os.makedirs(os.path.dirname(os.path.abspath(fbx_out)), exist_ok=True)
+        bpy.ops.export_scene.fbx(
+            filepath=os.path.abspath(fbx_out),
+            use_selection=True,
+            apply_unit_scale=True,
+            bake_anim=True,
+            bake_anim_use_all_bones=True,
+            bake_anim_force_startend_keying=True,
+            add_leaf_bones=False,
+        )
+
+        print(f"[retarget] FBX DEEPMOTION exporte : {fbx_out}")
+        print(f"[retarget] PIPELINE COMPLET. POUR L'EMPEROR.")
+
+        return {
+            "status":              "ok",
+            "mode":                "DEEPMOTION",
+            "fcurves_copies":      fcurves_copies,
+            "bones_communs":       len(communs),
+            "bones_absents_osseus": sorted(absents_osseus),
+            "frames":              nb_frames,
+            "mesh_present":        len(mesh_objects) > 0,
+            "mesh_count":          len(mesh_objects),
+            "fbx_out":             fbx_out,
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # MODE R15 / MIXAMO — retargeting + injection mesh optionnelle
+    # ═══════════════════════════════════════════════════════════════════════════
+
     if not t_pose:
         print("[retarget] AVERTISSEMENT : t_pose_incluse=false (derive possible sur certains bones)")
 
@@ -391,7 +567,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
     print(f"[retarget] Armature DeepMotion : {len(dm_armature.data.bones)} bones")
     print(f"[retarget] Animation : frames {frame_start} → {frame_end} ({nb_frames} frames)")
 
-    # ── Choisir le mapping selon le mode ─────────────────────────────────────
+    # Choisir le mapping selon le mode
     if mode == "R15":
         dm_to_target  = DM_TO_R15
         target_hier   = R15_HIERARCHY
@@ -401,12 +577,6 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
         nb_bones_ref  = 15
 
     else:  # MIXAMO
-        # Detecter le prefixe (avec ou sans "mixamorig:")
-        dm_bone_names_check = {b.name for b in dm_armature.data.bones}
-        # L'armature DeepMotion n'a pas de prefixe mixamo.
-        # Le prefixe cible est toujours MIXAMO_PREFIX pour les noms du rig output.
-        # Cependant : si le FBX avatar de l'utilisateur n'a pas le prefixe, CORPUS
-        # devra etre configure en consequence. Par defaut on genere avec prefixe.
         prefix        = MIXAMO_PREFIX
         dm_to_target, target_hier, root_target = _build_mixamo_mapping(prefix)
         root_dm       = ROOT_BONE_DM
@@ -414,7 +584,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
         nb_bones_ref  = 22
         print(f"[retarget] Prefixe Mixamo utilise : '{prefix}'")
 
-    # ── Validation bones DeepMotion ──────────────────────────────────────────
+    # Validation bones DeepMotion
     dm_bone_names   = {b.name for b in dm_armature.data.bones}
     bones_presents  = [k for k in dm_to_target if k in dm_bone_names]
     bones_manquants = [k for k in dm_to_target if k not in dm_bone_names]
@@ -429,11 +599,11 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
 
     print(f"[retarget] Bones cartographies : {len(bones_presents)}/{nb_bones_ref}")
 
-    # ── Extraction pose repos ─────────────────────────────────────────────────
+    # Extraction pose repos
     print("[retarget] Extraction de la pose repos DeepMotion...")
     rest_pose = _extract_rest_pose(dm_armature)
 
-    # ── Construction du rig cible ─────────────────────────────────────────────
+    # Construction du rig cible
     print(f"[retarget] Construction du rig {mode} (ZERO fichier GLB)...")
     scene      = bpy.context.scene
     target_arm = _build_target_armature(scene, rest_pose, dm_to_target, target_hier, rig_name)
@@ -444,12 +614,12 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
         status  = "OK" if dm_name in dm_bone_names else "MANQUANT"
         print(f"  {t_name:30s} ← {dm_name:20s} [{status}]")
 
-    # ── Creer l'action cible ──────────────────────────────────────────────────
+    # Creer l'action cible
     target_action = bpy.data.actions.new(name=f"{mode}_Animation")
     target_arm.animation_data_create()
     target_arm.animation_data.action = target_action
 
-    # ── Transfert animation ───────────────────────────────────────────────────
+    # Transfert animation
     print(f"[retarget] Transfert animation : {nb_frames} frames en cours...")
     frames_done = _transfer_animation(
         scene, dm_armature, target_arm,
@@ -458,9 +628,21 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
     )
     print(f"[retarget] Transfert termine : {frames_done} frames")
 
-    # ── Export FBX ────────────────────────────────────────────────────────────
+    # Injection mesh OSSEUS si avatar_fbx fourni
+    mesh_objects  = []
+    mesh_injected = False
+    if avatar_fbx:
+        print(f"[retarget] Injection mesh OSSEUS : {avatar_fbx}")
+        mesh_objects  = _import_osseus_meshes(avatar_fbx, scene)
+        mesh_injected = len(mesh_objects) > 0
+        if not mesh_injected:
+            print("[retarget] AVERTISSEMENT : aucun mesh trouve dans l'avatar OSSEUS")
+
+    # Export FBX : rig cible + meshes si disponibles
     bpy.ops.object.select_all(action="DESELECT")
     target_arm.select_set(True)
+    for m in mesh_objects:
+        m.select_set(True)
     bpy.context.view_layer.objects.active = target_arm
     scene.frame_set(frame_start)
 
@@ -486,6 +668,8 @@ def run(fbx_in: str, plan_path: str, fbx_out: str, mode: str = "R15") -> dict:
         "frames_transferees": frames_done,
         "target_bones":       list(target_hier.keys()),
         "t_pose_disponible":  t_pose,
+        "mesh_present":       mesh_injected,
+        "mesh_count":         len(mesh_objects),
         "fbx_out":            fbx_out,
     }
 
@@ -500,16 +684,28 @@ if __name__ == "__main__":
         argv = []
 
     parser = argparse.ArgumentParser(
-        description="FERRUS ANIMUS — OUTPUT : Retargeting DeepMotion → R15 ou Mixamo"
+        description="FERRUS ANIMUS — OUTPUT : Retargeting DeepMotion → DEEPMOTION / R15 / Mixamo"
     )
-    parser.add_argument("--fbx-in",  required=True, help="FBX corrige (sortie EXEC)")
-    parser.add_argument("--plan",    required=True, help="plan_corrections.json")
-    parser.add_argument("--fbx-out", required=True, help="FBX de sortie")
-    parser.add_argument("--mode",    default="R15",  choices=["R15", "MIXAMO"],
-                        help="Mode retargeting : R15 (defaut) ou MIXAMO (22 bones Mixamo.com)")
+    parser.add_argument("--fbx-in",     required=True,
+                        help="FBX corrige (sortie EXEC)")
+    parser.add_argument("--plan",       required=True,
+                        help="plan_corrections.json")
+    parser.add_argument("--fbx-out",    required=True,
+                        help="FBX de sortie")
+    parser.add_argument("--mode",       default="R15",
+                        choices=["R15", "MIXAMO", "DEEPMOTION"],
+                        help="Mode retargeting : R15 (defaut), MIXAMO ou DEEPMOTION")
+    parser.add_argument("--avatar-fbx", default=None,
+                        help="FBX OSSEUS (requis pour DEEPMOTION, optionnel pour R15/MIXAMO)")
 
     args = parser.parse_args(argv)
 
-    result = run(args.fbx_in, args.plan, args.fbx_out, mode=args.mode)
+    result = run(
+        fbx_in=args.fbx_in,
+        plan_path=args.plan,
+        fbx_out=args.fbx_out,
+        mode=args.mode,
+        avatar_fbx=args.avatar_fbx,
+    )
     print("\n[retarget] Rapport final :")
     print(json.dumps(result, indent=2, ensure_ascii=False))
