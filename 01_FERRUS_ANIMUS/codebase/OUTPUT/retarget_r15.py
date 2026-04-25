@@ -499,23 +499,44 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
 
-        # 4. Copier les FCurves directement sur l'armature OSSEUS
-        print("[retarget] Copie directe des FCurves DeepMotion → OSSEUS...")
-        fcurves_copies = _copy_fcurves_direct(dm_action, osseus_arm)
-        print(f"[retarget] FCurves copiees : {fcurves_copies}")
+        # 4. Bake frame-par-frame DeepMotion → OSSEUS (memes noms de bones)
+        # NOTE: copie directe de FCurves ne suffit pas — bake_anim Blender evalue
+        # le dependency graph, pas les FCurves Python. keyframe_insert() obligatoire.
+        print("[retarget] Bake frame-par-frame DeepMotion → OSSEUS...")
 
-        # 5. Supprimer l'armature DeepMotion (plus necessaire)
+        for pb in osseus_arm.pose.bones:
+            pb.rotation_mode = "QUATERNION"
+
+        new_action = bpy.data.actions.new(name="DEEPMOTION_Baked")
+        osseus_arm.animation_data_create()
+        osseus_arm.animation_data.action = new_action
+
+        for frame in range(frame_start, frame_end + 1):
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+
+            for pb in osseus_arm.pose.bones:
+                dm_pb = dm_arm.pose.bones.get(pb.name)
+                if dm_pb is None:
+                    continue
+                pb.rotation_quaternion = dm_pb.matrix_basis.to_quaternion()
+                pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+                if pb.parent is None:  # Root bone : location aussi
+                    pb.location = dm_pb.matrix_basis.translation.copy()
+                    pb.keyframe_insert(data_path="location", frame=frame)
+
+        fcurves_copies = len(new_action.fcurves)
+        print(f"[retarget] FCurves bakees : {fcurves_copies}")
+
+        # 5. Supprimer l'armature DeepMotion et les cameras
         bpy.data.objects.remove(dm_arm, do_unlink=True)
+        for cam_obj in [o for o in scene.objects if o.type == "CAMERA"]:
+            bpy.data.objects.remove(cam_obj, do_unlink=True)
 
         # 6. Exporter : armature OSSEUS + meshes
-        # Definir le range scene pour que bake_anim couvre toute l'animation
         scene.frame_start = frame_start
         scene.frame_end   = frame_end
         scene.frame_set(frame_start)
-
-        # Supprimer les cameras importees (ex: FERRUS_Camera de camera_follow)
-        for cam_obj in [o for o in scene.objects if o.type == "CAMERA"]:
-            bpy.data.objects.remove(cam_obj, do_unlink=True)
 
         bpy.ops.object.select_all(action="DESELECT")
         osseus_arm.select_set(True)
