@@ -244,9 +244,9 @@ def _load_mask_params(plan_path: str) -> list | None:
     valides = []
     for entry in entries:
         membre = entry.get("membre", "")
-        if membre not in MEMBRE_BONES:
+        if membre not in MEMBRE_BONES_CANDIDATES:
             print(f"[mask_limbs] Membre inconnu ignore : '{membre}' "
-                  f"(valeurs acceptees : {list(MEMBRE_BONES.keys())})")
+                  f"(valeurs acceptees : {list(MEMBRE_BONES_CANDIDATES.keys())})")
             continue
         frame_debut = int(entry.get("frame_debut", 0))
         frame_fin   = int(entry.get("frame_fin", 99999))
