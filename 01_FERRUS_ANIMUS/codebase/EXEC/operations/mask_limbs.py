@@ -47,18 +47,97 @@ import sys
 import os
 import json
 import argparse
+import re
 
 
-# ══ Mapping membres → bones DeepMotion ════════════════════════════════════════
+# ══ Mapping membres → candidates bones (multi-convention) ═════════════════════
+# Chaque membre contient une liste de GROUPES.
+# Un groupe = plusieurs noms candidats qui resolvent un SEUL bone.
+# La resolution prend le premier candidat present dans l'armature.
 
-MEMBRE_BONES = {
-    "main_gauche":  ["l_hand_JNT"],
-    "main_droite":  ["r_hand_JNT"],
-    "pied_gauche":  ["l_foot_JNT"],
-    "pied_droit":   ["r_foot_JNT"],
-    "jambe_gauche": ["l_leg_JNT", "l_foot_JNT"],
-    "jambe_droite": ["r_leg_JNT", "r_foot_JNT"],
+MEMBRE_BONES_CANDIDATES = {
+    "main_gauche": [
+        ["l_hand_JNT", "LeftHand", "Left_Hand", "l_hand", "mixamorig:LeftHand"],
+    ],
+    "main_droite": [
+        ["r_hand_JNT", "RightHand", "Right_Hand", "r_hand", "mixamorig:RightHand"],
+    ],
+    "pied_gauche": [
+        ["l_foot_JNT", "LeftFoot", "Left_Foot", "l_foot", "mixamorig:LeftFoot"],
+    ],
+    "pied_droit": [
+        ["r_foot_JNT", "RightFoot", "Right_Foot", "r_foot", "mixamorig:RightFoot"],
+    ],
+    "jambe_gauche": [
+        ["l_leg_JNT", "LeftLeg", "Left_Leg", "l_leg",
+         "mixamorig:LeftLeg", "mixamorig:LeftUpLeg", "LeftUpLeg"],
+        ["l_foot_JNT", "LeftFoot", "Left_Foot", "l_foot", "mixamorig:LeftFoot"],
+    ],
+    "jambe_droite": [
+        ["r_leg_JNT", "RightLeg", "Right_Leg", "r_leg",
+         "mixamorig:RightLeg", "mixamorig:RightUpLeg", "RightUpLeg"],
+        ["r_foot_JNT", "RightFoot", "Right_Foot", "r_foot", "mixamorig:RightFoot"],
+    ],
 }
+
+# Patterns regex de fallback (case-insensitive) si aucun candidat exact ne matche
+MEMBRE_REGEX_FALLBACK = {
+    "main_gauche":  [r"(?i)^l(?:eft)?[\W_]*hand$"],
+    "main_droite":  [r"(?i)^r(?:ight)?[\W_]*hand$"],
+    "pied_gauche":  [r"(?i)^l(?:eft)?[\W_]*foot$"],
+    "pied_droit":   [r"(?i)^r(?:ight)?[\W_]*foot$"],
+    "jambe_gauche": [r"(?i)^l(?:eft)?[\W_]*(?:leg|upleg|thigh)$",
+                     r"(?i)^l(?:eft)?[\W_]*foot$"],
+    "jambe_droite": [r"(?i)^r(?:ight)?[\W_]*(?:leg|upleg|thigh)$",
+                     r"(?i)^r(?:ight)?[\W_]*foot$"],
+}
+
+
+# ══ Helpers bone discovery ════════════════════════════════════════════════════
+
+def _get_available_bones(action) -> set:
+    """Extrait tous les noms de bones disponibles depuis les FCurves."""
+    bones = set()
+    for fc in action.fcurves:
+        m = re.search(r'"([^"]+)"', fc.data_path)
+        if m:
+            bones.add(m.group(1))
+    return bones
+
+
+def _resolve_bones_for_membre(membre: str, available_bones: set) -> list:
+    """
+    Resout les noms de bones reels pour un membre donne.
+    Essaie les candidats exacts en priorite, puis les patterns regex.
+    Retourne la liste des bones trouves (un par groupe de candidats).
+    """
+    groups    = MEMBRE_BONES_CANDIDATES.get(membre, [])
+    fallbacks = MEMBRE_REGEX_FALLBACK.get(membre, [])
+    resolved  = []
+
+    for i, group in enumerate(groups):
+        found = None
+
+        # 1. Recherche exacte parmi les candidats du groupe
+        for candidate in group:
+            if candidate in available_bones:
+                found = candidate
+                break
+
+        # 2. Fallback regex pour ce groupe
+        if found is None and i < len(fallbacks):
+            pattern = fallbacks[i]
+            matches = [b for b in available_bones if re.search(pattern, b)]
+            if matches:
+                found = sorted(matches)[0]  # deterministe
+
+        if found:
+            resolved.append(found)
+        else:
+            print(f"[mask_limbs] Avertissement : aucun bone trouve pour "
+                  f"'{membre}' groupe {i} (candidates: {group})")
+
+    return resolved
 
 
 # ══ Helpers FCurve ════════════════════════════════════════════════════════════
@@ -216,6 +295,10 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
     if not action:
         raise RuntimeError("[mask_limbs] Aucune animation dans l'armature")
 
+    # Decouvrir les bones disponibles dans l'armature
+    available_bones = _get_available_bones(action)
+    print(f"[mask_limbs] {len(available_bones)} bones detectes dans l'armature")
+
     # Resume des operations planifiees
     print(f"[mask_limbs] {len(params)} plage(s) de freeze a appliquer :")
     for entry in params:
@@ -229,7 +312,10 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
         membre      = entry["membre"]
         frame_debut = entry["frame_debut"]
         frame_fin   = entry["frame_fin"]
-        bones       = MEMBRE_BONES[membre]
+        bones       = _resolve_bones_for_membre(membre, available_bones)
+        if not bones:
+            print(f"[mask_limbs] {membre:15s} : aucun bone resolu — membre ignore")
+            continue
 
         entry_detail = {
             "membre": membre,
@@ -308,3 +394,4 @@ if __name__ == "__main__":
     result = run(args.fbx_in, args.plan, args.fbx_out)
     print("\n[mask_limbs] Rapport final :")
     print(json.dumps(result, indent=2, ensure_ascii=False))
+
