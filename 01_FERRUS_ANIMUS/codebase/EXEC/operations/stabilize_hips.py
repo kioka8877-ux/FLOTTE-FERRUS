@@ -34,8 +34,8 @@ import argparse
 
 # ══ Constantes ════════════════════════════════════════════════════════════════
 
-HIP_BONE      = "hips_JNT"
-AXIS_VERTICAL = 1  # array_index 1 = Y dans les FBX DeepMotion (Y-up convention)
+HIP_BONE_CANDIDATES = ["hips_JNT", "Hip", "Hips", "hips", "Pelvis", "pelvis", "mixamorig:Hips"]
+AXIS_VERTICAL       = 1  # array_index 1 = Y dans les FBX DeepMotion (Y-up convention)
 
 
 # ══ Detection et correction de derive ════════════════════════════════════════
@@ -187,20 +187,40 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
     if not action:
         raise RuntimeError("[stabilize_hips] Aucune animation dans l'armature")
 
-    # Trouver la FCurve Y des hanches
-    fc_y = next(
-        (fc for fc in action.fcurves
-         if HIP_BONE in fc.data_path
-         and "location" in fc.data_path
-         and fc.array_index == AXIS_VERTICAL),
-        None
-    )
+    # Trouver la FCurve Y des hanches (detection dynamique du nom de bone)
+    fc_y        = None
+    matched_hip = None
+    for candidate in HIP_BONE_CANDIDATES:
+        fc_y = next(
+            (fc for fc in action.fcurves
+             if candidate in fc.data_path
+             and "location" in fc.data_path
+             and fc.array_index == AXIS_VERTICAL),
+            None
+        )
+        if fc_y:
+            matched_hip = candidate
+            break
 
     if fc_y is None:
-        print(f"[stabilize_hips] FCurve Y de {HIP_BONE} introuvable — skip")
+        # Fallback case-insensitive sur "hip"
+        fc_y = next(
+            (fc for fc in action.fcurves
+             if "hip" in fc.data_path.lower()
+             and "location" in fc.data_path
+             and fc.array_index == AXIS_VERTICAL),
+            None
+        )
+        if fc_y:
+            matched_hip = "fallback_hip_search"
+
+    if fc_y is None:
+        print(f"[stabilize_hips] FCurve Y hanche introuvable (candidates: {HIP_BONE_CANDIDATES}) — skip")
         import shutil
         shutil.copy2(fbx_in, fbx_out)
-        return {"status": "skipped", "raison": f"FCurve Y de {HIP_BONE} introuvable"}
+        return {"status": "skipped", "raison": "FCurve Y hanche introuvable"}
+
+    print(f"[stabilize_hips] Bone hanche trouve : {matched_hip}")
 
     # Analyser la derive reelle dans les donnees
     drift = _detect_drift(fc_y)
@@ -218,7 +238,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str) -> dict:
 
     # Appliquer la correction par detrending lineaire
     nb_corriges = _apply_correction(fc_y, drift["trend"])
-    print(f"[stabilize_hips] {nb_corriges} keyframes corriges sur {HIP_BONE}.location.Y")
+    print(f"[stabilize_hips] {nb_corriges} keyframes corriges sur {matched_hip}.location.Y")
 
     # Exporter le FBX
     os.makedirs(os.path.dirname(os.path.abspath(fbx_out)), exist_ok=True)
@@ -265,3 +285,4 @@ if __name__ == "__main__":
     result = run(args.fbx_in, args.plan, args.fbx_out)
     print("\n[stabilize_hips] Rapport final :")
     print(json.dumps(result, indent=2, ensure_ascii=False))
+
