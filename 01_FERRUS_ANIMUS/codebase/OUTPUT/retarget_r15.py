@@ -475,9 +475,20 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         bpy.ops.wm.read_factory_settings(use_empty=True)
         scene = bpy.context.scene
 
+        # Parametres d'import FBX uniformes — garantit le meme espace de coordonnees
+        # pour OSSEUS et DeepMotion, evite le mismatch d'axes (bug "Superman / vole").
+        FBX_IMPORT_PARAMS = dict(
+            axis_forward="-Z",
+            axis_up="Y",
+            use_manual_orientation=False,
+            global_scale=1.0,
+            apply_unit_scale=True,
+            use_anim=True,
+        )
+
         # 1. Charger l'avatar OSSEUS (mesh + squelette T-pose)
         print(f"[retarget] Chargement OSSEUS : {avatar_fbx}")
-        bpy.ops.import_scene.fbx(filepath=os.path.abspath(avatar_fbx))
+        bpy.ops.import_scene.fbx(filepath=os.path.abspath(avatar_fbx), **FBX_IMPORT_PARAMS)
 
         osseus_arm = next((o for o in scene.objects if o.type == "ARMATURE"), None)
         if not osseus_arm:
@@ -488,10 +499,19 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
               f"{len(osseus_arm.data.bones)} bones, "
               f"{len(mesh_objects)} mesh(es)")
 
+        # Normaliser l'espace de l'armature OSSEUS (pas d'animation → safe).
+        # Apres transform_apply, osseus_arm.matrix_world ≈ identite.
+        # Les matrix_basis des bones DeepMotion seront directement comparables.
+        bpy.context.view_layer.objects.active = osseus_arm
+        bpy.ops.object.select_all(action="DESELECT")
+        osseus_arm.select_set(True)
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        print(f"[retarget] OSSEUS transform normalise : {osseus_arm.matrix_world}")
+
         # 2. Charger le FBX DeepMotion corrige (animation)
         print(f"[retarget] Chargement DeepMotion : {fbx_in}")
         existing_before = set(scene.objects)
-        bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_in))
+        bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_in), **FBX_IMPORT_PARAMS)
 
         dm_arm = next(
             (o for o in scene.objects if o.type == "ARMATURE" and o != osseus_arm),
@@ -548,6 +568,12 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         osseus_arm.animation_data_create()
         osseus_arm.animation_data.action = new_action
 
+        # Matrice de conversion espace DM → espace OSSEUS (une seule fois, hors boucle).
+        # Apres transform_apply sur OSSEUS, osseus_arm.matrix_world ≈ identite,
+        # donc dm_to_osseus ≈ dm_arm.matrix_world.
+        # Cela corrige le mismatch d'axes entre les deux armatures.
+        dm_to_osseus = osseus_arm.matrix_world.inverted() @ dm_arm.matrix_world
+
         for frame in range(frame_start, frame_end + 1):
             scene.frame_set(frame)
             bpy.context.view_layer.update()
@@ -557,10 +583,20 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
                 dm_pb = dm_arm.pose.bones.get(dm_name)
                 if dm_pb is None:
                     continue
-                pb.rotation_quaternion = dm_pb.matrix_basis.to_3x3().to_quaternion()
+                # Fix #3 : decompose() gere correctement les matrices avec scale non-unitaire.
+                # to_quaternion() direct sur Matrix4x4 echoue si scale != 1.
+                _, rot, _ = dm_pb.matrix_basis.decompose()
+                pb.rotation_quaternion = rot
                 pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+
                 if pb.parent is None:  # Root bone : location aussi
-                    pb.location = dm_pb.matrix_basis.translation.copy()
+                    # Fix #4 : lire la position en espace monde DM, convertir en espace OSSEUS.
+                    # matrix_basis.translation est en espace local de l'armature DM.
+                    # Si dm_arm a une rotation/scale objet, cette translation est dans
+                    # un repere different de celui d'OSSEUS → personnage qui vole.
+                    world_mat = dm_arm.matrix_world @ dm_pb.matrix
+                    loc, _, _ = (osseus_arm.matrix_world.inverted() @ world_mat).decompose()
+                    pb.location = loc
                     pb.keyframe_insert(data_path="location", frame=frame)
 
         fcurves_copies = len(new_action.fcurves)
@@ -615,9 +651,17 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
     if not t_pose:
         print("[retarget] AVERTISSEMENT : t_pose_incluse=false (derive possible sur certains bones)")
 
-    # Charger le FBX corrige
+    # Charger le FBX corrige — memes parametres d'axes que le mode DEEPMOTION
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_in))
+    bpy.ops.import_scene.fbx(
+        filepath=os.path.abspath(fbx_in),
+        axis_forward="-Z",
+        axis_up="Y",
+        use_manual_orientation=False,
+        global_scale=1.0,
+        apply_unit_scale=True,
+        use_anim=True,
+    )
 
     dm_armature = next((o for o in bpy.context.scene.objects if o.type == "ARMATURE"), None)
     if not dm_armature:
