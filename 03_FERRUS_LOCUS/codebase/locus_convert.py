@@ -225,6 +225,27 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     bpy.ops.object.bake(type='EMIT')
     print("[LOCUS][BAKE] Baking termine.")
 
+    # ── FIX : recabler le materiau pour export GLB ──────────────
+    # Apres bake, remplacer le shader EMIT par PrincipledBSDF + texture bakee + UV
+    # Sans ce recablage, le GLB exporte un mesh noir (bake_node deconnecte)
+    nt.nodes.clear()
+
+    uv_map_node  = nt.nodes.new('ShaderNodeUVMap')
+    uv_map_node.uv_map = "UVMap"
+
+    img_tex_node = nt.nodes.new('ShaderNodeTexImage')
+    img_tex_node.image = bake_img
+
+    bsdf_node    = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    out_glb_node = nt.nodes.new('ShaderNodeOutputMaterial')
+
+    nt.links.new(uv_map_node.outputs['UV'],          img_tex_node.inputs['Vector'])
+    nt.links.new(img_tex_node.outputs['Color'],      bsdf_node.inputs['Base Color'])
+    nt.links.new(bsdf_node.outputs['BSDF'],          out_glb_node.inputs['Surface'])
+
+    print("[LOCUS][BAKE] Materiau recable : PrincipledBSDF + UVMap + texture bakee.")
+    # ────────────────────────────────────────────────────────────
+
     # Sauvegarder la texture dans le GLB (pack)
     bake_img.pack()
 
