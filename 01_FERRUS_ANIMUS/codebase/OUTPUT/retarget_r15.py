@@ -545,19 +545,28 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
 
         # 4. Bake frame-par-frame DeepMotion → OSSEUS
-        # Le mapping DM_TO_OSSEUS traduit les noms courts DeepMotion vers les noms _JNT d'OSSEUS.
-        # Les bones avec noms identiques (doigts, spine_JNT, etc.) sont passes directement.
-        print("[retarget] Construction du mapping DM → OSSEUS...")
+        # Auto-detection convention nommage OSSEUS (R15 / Mixamo / DeepMotion-JNT).
+        # Construit la table osseus_name → dm_name selon les bones presents.
+        print("[retarget] Detection convention nommage OSSEUS...")
 
-        # Construire la table de lookup : osseus_name → dm_name
-        osseus_to_dm = {v: k for k, v in DM_TO_OSSEUS.items()}
-        dm_bone_set = {b.name for b in dm_arm.data.bones}
-        for bn in dm_bone_set:
-            if bn not in osseus_to_dm.values() and bn not in {v for v in DM_TO_OSSEUS.keys()}:
-                # Bone DM dont le nom existe tel quel dans OSSEUS (doigts, spine_JNT, etc.)
-                osseus_to_dm.setdefault(bn, bn)
-
-        print(f"[retarget] Bones mappes : {len(osseus_to_dm)}")
+        osseus_bone_names_set = {b.name for b in osseus_arm.data.bones}
+        if "LowerTorso" in osseus_bone_names_set:
+            # Convention R15 (Roblox natif) — inverser DM_TO_R15
+            osseus_to_dm = {v: k for k, v in DM_TO_R15.items()}
+            print(f"[retarget] Convention OSSEUS : R15 ({len(osseus_to_dm)} bones mappes)")
+        elif f"{MIXAMO_PREFIX}Hips" in osseus_bone_names_set:
+            # Convention Mixamo
+            dm_to_mx, _, _ = _build_mixamo_mapping(MIXAMO_PREFIX)
+            osseus_to_dm = {v: k for k, v in dm_to_mx.items()}
+            print(f"[retarget] Convention OSSEUS : Mixamo ({len(osseus_to_dm)} bones mappes)")
+        else:
+            # Convention DeepMotion/JNT — logique originale
+            osseus_to_dm = {v: k for k, v in DM_TO_OSSEUS.items()}
+            dm_bone_set = {b.name for b in dm_arm.data.bones}
+            for bn in dm_bone_set:
+                if bn not in osseus_to_dm.values() and bn not in set(DM_TO_OSSEUS.keys()):
+                    osseus_to_dm.setdefault(bn, bn)
+            print(f"[retarget] Convention OSSEUS : DeepMotion/JNT ({len(osseus_to_dm)} bones mappes)")
         print("[retarget] Bake frame-par-frame DeepMotion → OSSEUS...")
 
         for pb in osseus_arm.pose.bones:
@@ -589,13 +598,13 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
                 pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
 
                 if pb.parent is None:  # Root bone : location aussi
-                    # Fix #4 : lire la position en espace monde DM, convertir en espace OSSEUS.
-                    # matrix_basis.translation est en espace local de l'armature DM.
-                    # Si dm_arm a une rotation/scale objet, cette translation est dans
-                    # un repere different de celui d'OSSEUS → personnage qui vole.
-                    world_mat = dm_arm.matrix_world @ dm_pb.matrix
-                    loc, _, _ = (osseus_arm.matrix_world.inverted() @ world_mat).decompose()
-                    pb.location = loc
+                    # Fix #5 : DELTA depuis rest position — evite la levitation.
+                    # pb.location est un OFFSET depuis rest (pas une position absolue).
+                    # Conversion via espace monde pour gerer rotation/scale objet.
+                    dm_rest_world = dm_arm.matrix_world @ dm_arm.data.bones[dm_pb.name].head_local
+                    dm_pose_world = (dm_arm.matrix_world @ dm_pb.matrix).translation
+                    delta_world   = dm_pose_world - dm_rest_world
+                    pb.location   = osseus_arm.matrix_world.to_3x3().inverted() @ delta_world
                     pb.keyframe_insert(data_path="location", frame=frame)
 
         fcurves_copies = len(new_action.fcurves)
