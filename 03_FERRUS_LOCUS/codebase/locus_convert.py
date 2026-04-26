@@ -85,26 +85,23 @@ def op_mesh_import(ply_path: str) -> bpy.types.Object:
     vert_count = len(obj.data.vertices)
     print(f"[LOCUS][MESH] Vertices: {vert_count:,} | Faces apres import: {face_count:,}")
 
-    # Si point cloud (0 faces) — reconstruction surface via Voxel Remesh
+    # Si point cloud (0 faces) — reconstruction via convex hull bmesh
     if face_count == 0 and vert_count > 0:
-        print("[LOCUS][MESH] Point cloud detecte — reconstruction surface (Voxel Remesh)...")
-        verts = [v.co for v in obj.data.vertices]
-        xs = [v[0] for v in verts]
-        ys = [v[1] for v in verts]
-        zs = [v[2] for v in verts]
-        extent = max(
-            max(xs) - min(xs),
-            max(ys) - min(ys),
-            max(zs) - min(zs),
-        )
-        voxel_size = max(0.005, min(0.05, extent / 200))
-        print(f"[LOCUS][MESH] Extent: {extent:.3f} | Voxel size: {voxel_size:.4f}")
-        mod = obj.modifiers.new(name="LOCUS_Remesh", type='REMESH')
-        mod.mode = 'VOXEL'
-        mod.voxel_size = voxel_size
-        bpy.ops.object.modifier_apply(modifier=mod.name)
+        print("[LOCUS][MESH] Point cloud detecte — convex hull bmesh...")
+        import bmesh as _bmesh
+        bm = _bmesh.new()
+        bm.from_mesh(obj.data)
+        result = _bmesh.ops.convex_hull(bm, input=bm.verts, use_existing_faces=False)
+        interior = [g for g in result.get('geom_interior', [])
+                    if isinstance(g, _bmesh.types.BMVert)]
+        unused   = [g for g in result.get('geom_unused', [])
+                    if isinstance(g, _bmesh.types.BMVert)]
+        _bmesh.ops.delete(bm, geom=interior + unused, context='VERTS')
+        bm.to_mesh(obj.data)
+        bm.free()
+        obj.data.update()
         face_count = len(obj.data.polygons)
-        print(f"[LOCUS][MESH] Faces apres remesh: {face_count:,}")
+        print(f"[LOCUS][MESH] Faces apres convex hull: {face_count:,}")
 
     return obj
 
