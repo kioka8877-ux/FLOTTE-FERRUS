@@ -51,7 +51,7 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 |---|---|---|
 | 00 | FERRUS FORGE | OPERATIONNELLE - Validation imperiale 2026-04-18 |
 | 01 | FERRUS ANIMUS | OPERATIONNELLE - Pipeline complet livre |
-| 02 | FERRUS CORPUS | OPERATIONNELLE - Pipeline complet livre |
+| 02 | FERRUS CORPUS | EN DEVELOPPEMENT - Refonte mission v2.0 |
 | 03 | FERRUS LOCUS | EN ATTENTE DE DECRET IMPERIAL |
 | 04 | FERRUS OSSEUS | OPERATIONNELLE - Validation imperiale 2026-04-24 |
 
@@ -60,15 +60,13 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 ## Fregate 00 - FERRUS FORGE
 
 **Mission :** Convertir tout avatar brut (`.glb`, `.obj`, `.fbx`) en fichier `.blend`
-propre et exploitable par FERRUS CORPUS.
+propre et exploitable par les fregates aval.
 
 ```
 avatar_P1.glb  ┐
 avatar_P2.obj  │  →  [FORGE]  →  avatar_P1.blend
 avatar_P3.fbx  ┘                  avatar_P2.blend
                                    avatar_P3.blend
-                                         ↓
-                                  FERRUS CORPUS IN_AVATAR/
 ```
 
 ### Structure
@@ -89,18 +87,18 @@ avatar_P3.fbx  ┘                  avatar_P2.blend
 ## Fregate 01 - FERRUS ANIMUS
 
 **Mission :** Transformer des fichiers FBX d'animation bruts issus de DeepMotion
-en fichiers FBX retargetes au format Roblox R15, corriges et purifies.
+en fichiers FBX retargetes au format Roblox R15 ou OSSEUS (52 bones), corriges et purifies.
 
 ```
-DeepMotion FBX
+DeepMotion FBX + Avatar OSSEUS
      |
-  [INTEL] - Gemini (video) + Claude (FBX) -> plan_corrections.json
+  [INTEL] - Gemini (video) + Claude API (FBX) -> plan_corrections.json
      |
   [EXEC]  - 5 operations bpy headless (smooth, hips, foot_slide, camera, mask)
      |
- [OUTPUT] - Retargeting DeepMotion 52 bones -> R15 15 bones (programme, zero GLB)
+ [OUTPUT] - Retargeting DeepMotion -> R15 / Mixamo / OSSEUS 52 bones
      |
-  FBX R15 propre
+  FBX anime propre (avec mesh si mode DEEPMOTION)
 ```
 
 ### Structure
@@ -108,56 +106,71 @@ DeepMotion FBX
 ```
 01_FERRUS_ANIMUS/
   codebase/
-    INTEL/prompts/correction_prompt.txt
+    INTEL/
+      pre_parse_fbx.py
+      intel_skeleton.py
+      prompts/correction_prompt.txt
     EXEC/operations/
-      smooth_fcurves.py
-      stabilize_hips.py
-      remove_foot_slide.py
-      camera_follow.py
-      mask_limbs.py
+      smooth_fcurves.py / stabilize_hips.py / remove_foot_slide.py
+      camera_follow.py / mask_limbs.py
     OUTPUT/retarget_r15.py
-  IN/    <- Deposer les FBX DeepMotion ici
-  OUT/   <- Recuperer les FBX R15 ici
+  main_ferrus.ipynb
+  IN/ IN_AVATAR/ OUT/ CLAUDE_IN/ GEMINI_IN/
   docs/
-    FERRUS_STATE.md      <- Phylactere de Resurrection
-    FERRUS_PRD.md        <- Bible Technique
-    FERRUS_ROADMAP.md    <- Plan de Conquete
-    FERRUS_VALIDATION.md <- Protocole de Test
+    FERRUS_STATE.md / FERRUS_PRD.md / FERRUS_ROADMAP.md / FERRUS_VALIDATION.md
 ```
 
 ---
 
 ## Fregate 02 - FERRUS CORPUS
 
-**Mission :** Incarner les animations R15 de FERRUS ANIMUS dans un avatar Roblox.
-Transformer un squelette invisible en acteur visible, exportable en .blend (MASTER) et .glb (PREVIEW).
+**Mission :** Convertir les fichiers `.fbx` et `.glb` produits par la Flotte
+en fichiers `.blend` natifs Blender, prets pour EXODUS.
 
 ```
-ferrus_P*.fbx (squelette R15 anime)
-     +
-avatar_r15.blend (mesh Roblox)
-     |
-  [INJECT] - Transfert direct R15->R15 (noms identiques, zero mapping)
-     |
- corpus_P*.blend  <- MASTER pour EXODUS U01
- corpus_P*.glb    <- PREVIEW viewer en ligne
+ferrus_P*.fbx  ┐
+ferrus_P*.glb  │  →  [CORPUS]  →  corpus_P*.blend  →  EXODUS
+               ┘
 ```
+
+Conversion pure. Aucune logique d'animation. Aucun mapping de bones.
 
 ### Structure
 
 ```
 02_FERRUS_CORPUS/
   codebase/
-    inject_animation.py  <- Script Blender headless (coeur)
+    convert_to_blend.py  <- Script Blender headless (coeur)
     corpus_main.ipynb    <- Notebook Colab
-  IN/          <- ferrus_P*.fbx depuis 01_FERRUS_ANIMUS/OUT/
-  IN_AVATAR/   <- avatar_r15.blend (fourni une fois)
-  OUT/         <- corpus_P*.blend + corpus_P*.glb + rapport_corpus.json
+  IN/    <- ferrus_P*.fbx ou *.glb (depuis 01_FERRUS_ANIMUS/OUT/)
+  OUT/   <- corpus_P*.blend + rapport_corpus.json
   docs/
-    CORPUS_STATE.md      <- Phylactere de Resurrection
-    CORPUS_PRD.md        <- Bible Technique
-    CORPUS_ROADMAP.md    <- Plan de Conquete
-    CORPUS_VALIDATION.md <- Protocole de Test
+    CORPUS_STATE.md / CORPUS_PRD.md / CORPUS_ROADMAP.md / CORPUS_VALIDATION.md
+```
+
+---
+
+## Fregate 04 - FERRUS OSSEUS
+
+**Mission :** Prendre un mesh T-pose sans squelette et produire un FBX rige
+pret pour ANIMUS (52 bones DeepMotion / R15 / Mixamo).
+
+```
+mesh_T-pose.glb  →  [OSSEUS]  →  osseus_avatar.fbx (mesh + squelette 52 bones)
+                                        ↓
+                               01_FERRUS_ANIMUS/IN_AVATAR/
+```
+
+### Structure
+
+```
+04_FERRUS_OSSEUS/
+  codebase/
+    osseus_core.py       <- Script Blender headless (coeur)
+    osseus_main.ipynb    <- Notebook Colab
+  IN/    <- mesh T-pose brut
+  OUT/   <- osseus_avatar.fbx
+  docs/OSSEUS_STATE.md
 ```
 
 ---
