@@ -1,7 +1,7 @@
 # OSSEUS_STATE.md — Etat de la Fregate FERRUS OSSEUS
 # Phylactere de Resurrection — Fregate 04
 # FLOTTE FERRUS | AD MAJOREM GLORIAM IMPERATORIS
-# Derniere mise a jour : 2026-04-24
+# Derniere mise a jour : 2026-04-26
 
 ---
 
@@ -26,7 +26,7 @@
 | `README.md` | LIVRE | Documentation complete |
 | Template R15 (15 bones) | VALIDE EN PRODUCTION | 2 avatars GLB traites — Automatic Weights OK |
 | Template Mixamo (26 bones) | LIVRE | Non teste en production |
-| Template DeepMotion (52 bones) | LIVRE | Non teste en production |
+| Template DeepMotion (52 bones) | VALIDE EN PRODUCTION | avatar_P2 — 52 bones _JNT — FBX 3.22 Mo — viewer OK |
 | Import GLB/GLTF/OBJ/FBX | VALIDE | GLB valide en production |
 | Detection bbox T-pose | VALIDE | Hauteur/largeur correctement calculees |
 | Placement squelette auto | VALIDE | Proportions anatomiques OK |
@@ -43,7 +43,7 @@
 | Test | Priorite | Notes |
 |------|----------|-------|
 | Template Mixamo sur avatar game | HAUTE | |
-| Template DeepMotion 52 bones | MOYENNE | |
+| Template DeepMotion 52 bones | FERME | Valide en production 2026-04-26 — avatar_P2 |
 | Avatar multi-mesh (PLY split) | MOYENNE | Join teste en theorie |
 | Avatar non-centre (offset X/Y) | HAUTE | bbox prend en compte le centre |
 | Avatar echelle non-standard | MOYENNE | Transform apply avant bbox |
@@ -74,8 +74,8 @@
 
 ## Prochaine Etape
 
-1. Tester les FBX rigues dans FERRUS ANIMUS (retargeting)
-2. Valider le rendu visuel dans un viewer 3D
+1. ~~Tester les FBX rigues dans FERRUS ANIMUS (retargeting)~~ → EN COURS (ANIMUS Cell 9)
+2. ~~Valider le rendu visuel dans un viewer 3D~~ → VALIDE 2026-04-26 (avatar_P2 viewer OK)
 3. Tester template Mixamo
 
 ---
@@ -87,6 +87,7 @@
 | 2026-04-24 | Creation de la fregate, livraison complete |
 | 2026-04-24 | Validation en production — 2/2 avatars GLB → FBX R15 OK |
 | 2026-04-26 | BUG FIX — Textures perdues sur FBX Hunyuan : embed_textures=False → True + unpack images avant export |
+| 2026-04-26 | VALIDATION — Template DeepMotion 52 bones en production : avatar_P2 — FBX 3.22 Mo — 52/52 bones _JNT — viewer OK |
 
 ---
 
