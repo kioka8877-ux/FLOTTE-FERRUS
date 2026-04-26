@@ -370,100 +370,120 @@ def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
     return copied
 
 
-# ══ Mode DEEPMOTION — retargeting via contraintes + bake (FIX Superman) ═══════
+# ══ Mode DEEPMOTION — retargeting frame-par-frame via matrices world (FIX Superman) ══
 
-def _retarget_via_constraints(scene, dm_arm, osseus_arm, dm_to_osseus_full: dict,
-                               root_dm_name: str,
-                               frame_start: int, frame_end: int) -> int:
+def _retarget_frame_by_frame(scene, dm_arm, osseus_arm, dm_to_osseus_full: dict,
+                              root_dm_name: str,
+                              frame_start: int, frame_end: int) -> int:
     """
-    Transfere l'animation DM → OSSEUS via contraintes COPY_ROTATION/COPY_LOCATION + bake.
+    Transfere l'animation DM → OSSEUS frame-par-frame via matrices world-space.
 
-    Corrige le bug Superman (mismatch axes locaux Y-up DM / Z-up OSSEUS).
-    La copie directe de FCurves transfere des valeurs de rotation locale incompatibles.
-    Ici, Blender evalue la pose world-space a chaque frame et calcule automatiquement
-    la rotation locale correcte pour chaque bone OSSEUS.
+    Corrige le bug Superman independamment des rotations d'objet des armatures
+    et des differences de rest pose (Y-up DM vs Z-up OSSEUS, ou tout autre mismatch).
 
-    Principes :
-    - COPY_ROTATION target_space=WORLD / owner_space=WORLD : copie l'orientation absolue
-    - visual_keying=True : bake capture la pose avec contraintes, pas les valeurs brutes
-    - clear_constraints=True : supprime les contraintes apres le bake
-    - Sans transform_apply : bind pose intact → mesh reste visible
+    Algorithme pour chaque bone, chaque frame :
+      1. Recuperer la world matrix du bone DM (armature.matrix_world @ pose_bone.matrix)
+      2. Convertir dans l'espace armature OSSEUS (osseus_arm.matrix_world.inverted())
+      3. Decomposer en matrix_basis :
+         basis = bone_rest^-1 @ parent_pose^-1 @ target_armature_local
+      4. Inserer les keyframes rotation_quaternion (+ location pour le root)
+
+    Les bones sont traites par niveau de profondeur (parent avant enfant) avec
+    une mise a jour du view_layer entre chaque niveau — garantit que les enfants
+    voient la matrice parent correcte.
+
+    Sans transform_apply : bind pose intact → mesh visible.
 
     Returns:
-        Nombre de FCurves dans l'action bakee.
+        Nombre de FCurves dans l'action generee.
     """
     import bpy
+    from collections import defaultdict
 
     osseus_bone_names = {b.name for b in osseus_arm.data.bones}
 
-    # Forcer QUATERNION sur tous les bones OSSEUS avant le bake
+    # Forcer QUATERNION sur tous les bones OSSEUS
     for pb in osseus_arm.pose.bones:
         pb.rotation_mode = "QUATERNION"
 
-    # S'assurer que l'animation data existe sur OSSEUS
     osseus_arm.animation_data_create()
+    action = bpy.data.actions.new("DEEPMOTION_Animation")
+    osseus_arm.animation_data.action = action
 
-    constraints_added = 0
+    # Reverse mapping osseus_bn → dm_bn (filtre bones existants)
+    osseus_to_dm = {
+        v: k for k, v in dm_to_osseus_full.items()
+        if v in osseus_bone_names
+    }
 
-    for dm_bn, osseus_bn in dm_to_osseus_full.items():
-        if osseus_bn not in osseus_bone_names:
-            continue
+    # Grouper les bones par profondeur (parent avant enfant)
+    def _depth(pb):
+        d, b = 0, pb.parent
+        while b:
+            d += 1
+            b = b.parent
+        return d
+
+    depth_groups: dict[int, list] = defaultdict(list)
+    for osseus_bn, dm_bn in osseus_to_dm.items():
         osseus_pb = osseus_arm.pose.bones.get(osseus_bn)
-        dm_pb     = dm_arm.pose.bones.get(dm_bn)
-        if osseus_pb is None or dm_pb is None:
-            continue
+        if osseus_pb is not None:
+            depth_groups[_depth(osseus_pb)].append((osseus_pb, dm_bn))
 
-        # COPY_ROTATION world→world : Blender recalcule la rotation locale exacte
-        # pour le bone OSSEUS — elimine le mismatch d'axes locaux DM/OSSEUS.
-        cr             = osseus_pb.constraints.new("COPY_ROTATION")
-        cr.name        = "FERRUS_ROT"
-        cr.target      = dm_arm
-        cr.subtarget   = dm_bn
-        cr.target_space = "WORLD"
-        cr.owner_space  = "WORLD"
-        constraints_added += 1
+    depth_levels = sorted(depth_groups.keys())
 
-        # Bone racine : transfert de position aussi
-        if dm_bn == root_dm_name:
-            cl              = osseus_pb.constraints.new("COPY_LOCATION")
-            cl.name         = "FERRUS_LOC"
-            cl.target       = dm_arm
-            cl.subtarget    = dm_bn
-            cl.target_space = "WORLD"
-            cl.owner_space  = "WORLD"
+    print(f"[retarget] {len(osseus_to_dm)} bones | {frame_end - frame_start + 1} frames "
+          f"| {len(depth_levels)} niveaux de profondeur")
+    print(f"[debug] DM  obj rot : {tuple(round(x, 4) for x in dm_arm.rotation_euler)}")
+    print(f"[debug] OSS obj rot : {tuple(round(x, 4) for x in osseus_arm.rotation_euler)}")
 
-    print(f"[retarget] Contraintes posees : {constraints_added} bones")
+    frames_done = 0
+    for frame in range(frame_start, frame_end + 1):
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
 
-    # Selectionner osseus_arm et entrer en pose mode pour le bake
-    bpy.ops.object.select_all(action="DESELECT")
-    osseus_arm.select_set(True)
-    bpy.context.view_layer.objects.active = osseus_arm
-    bpy.ops.object.mode_set(mode="POSE")
-    bpy.ops.pose.select_all(action="SELECT")
+        osseus_arm_inv = osseus_arm.matrix_world.inverted()
 
-    scene.frame_start = frame_start
-    scene.frame_end   = frame_end
+        # Traiter niveau par niveau — update entre chaque niveau
+        # pour que les enfants voient la matrice parent a jour
+        for lvl in depth_levels:
+            for osseus_pb, dm_bn in depth_groups[lvl]:
+                dm_pb = dm_arm.pose.bones.get(dm_bn)
+                if dm_pb is None:
+                    continue
 
-    # Bake : visual_keying=True capture la pose avec contraintes appliquees,
-    # clear_constraints=True les supprime automatiquement apres le bake.
-    bpy.ops.nla.bake(
-        frame_start       = frame_start,
-        frame_end         = frame_end,
-        step              = 1,
-        only_selected     = True,
-        visual_keying     = True,
-        clear_constraints = True,
-        clear_parents     = False,
-        use_current_action= False,
-        bake_types        = {"POSE"},
-    )
+                # Matrice world du bone DM courant
+                dm_world = dm_arm.matrix_world @ dm_pb.matrix
 
-    bpy.ops.object.mode_set(mode="OBJECT")
+                # Cible dans l'espace armature OSSEUS
+                target_local = osseus_arm_inv @ dm_world
 
-    baked_action  = osseus_arm.animation_data.action if osseus_arm.animation_data else None
-    fcurves_count = len(baked_action.fcurves) if baked_action else 0
-    print(f"[retarget] Bake termine : {fcurves_count} FCurves sur "
-          f"{frame_end - frame_start + 1} frames")
+                # Decomposer en matrix_basis :
+                # target_local = parent_pose @ bone_rest @ matrix_basis
+                # => matrix_basis = bone_rest^-1 @ parent_pose^-1 @ target_local
+                rest = osseus_pb.bone.matrix_local
+                if osseus_pb.parent:
+                    basis = rest.inverted() @ osseus_pb.parent.matrix.inverted() @ target_local
+                else:
+                    basis = rest.inverted() @ target_local
+
+                osseus_pb.matrix_basis = basis
+
+            # Mise a jour par niveau — les enfants voient la bonne matrice parent
+            bpy.context.view_layer.update()
+
+        # Inserer les keyframes apres avoir pose tous les bones
+        for osseus_pb, dm_bn in [pair for lvl in depth_levels for pair in depth_groups[lvl]]:
+            osseus_pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+            if dm_bn == root_dm_name:
+                osseus_pb.keyframe_insert(data_path="location", frame=frame)
+
+        frames_done += 1
+        if frames_done % 100 == 0:
+            print(f"[retarget] Frame {frame}/{frame_end}...")
+
+    fcurves_count = len(action.fcurves)
+    print(f"[retarget] Transfert termine : {fcurves_count} FCurves | {frames_done} frames")
     return fcurves_count
 
 
@@ -647,7 +667,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         print(f"[retarget] Mapping total : {len(dm_to_osseus_full)} bones")
 
-        fcurves_copies = _retarget_via_constraints(
+        fcurves_copies = _retarget_frame_by_frame(
             scene, dm_arm, osseus_arm, dm_to_osseus_full,
             root_dm_name="Hip",
             frame_start=frame_start,
@@ -687,8 +707,8 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         return {
             "status":               "ok",
             "mode":                 "DEEPMOTION",
-            "methode":              "contraintes_bake",
-            "fcurves_bakees":       fcurves_copies,
+            "methode":              "frame_par_frame_world_matrix",
+            "fcurves_generees":     fcurves_copies,
             "bones_communs":        len(communs),
             "bones_absents_osseus": sorted(absents_osseus),
             "frames":               nb_frames,
