@@ -540,84 +540,59 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
 
-        # 4. Bake frame-par-frame DeepMotion → OSSEUS
-        # Auto-detection convention nommage OSSEUS (R15 / Mixamo / DeepMotion-JNT).
-        # Construit la table osseus_name → dm_name selon les bones presents.
-        print("[retarget] Detection convention nommage OSSEUS...")
+        # 4. Transfert direct FCurves DM → OSSEUS avec remapping de noms.
+        # Copie les rotations locales DM directement sur les bones OSSEUS.
+        # Fonctionne car OSSEUS (template deepmotion) genere des bones avec les memes
+        # axes locaux que DeepMotion (meme T-pose anatomique, meme head→tail direction).
+        # Zero bake frame-par-frame, zero contrainte — copie exacte des keyframes.
+        print("[retarget] Transfert FCurves direct DM → OSSEUS (remapping noms)...")
 
         osseus_bone_names_set = {b.name for b in osseus_arm.data.bones}
-        if "LowerTorso" in osseus_bone_names_set:
-            # Convention R15 (Roblox natif) — inverser DM_TO_R15
-            osseus_to_dm = {v: k for k, v in DM_TO_R15.items()}
-            print(f"[retarget] Convention OSSEUS : R15 ({len(osseus_to_dm)} bones mappes)")
-        elif f"{MIXAMO_PREFIX}Hips" in osseus_bone_names_set:
-            # Convention Mixamo
-            dm_to_mx, _, _ = _build_mixamo_mapping(MIXAMO_PREFIX)
-            osseus_to_dm = {v: k for k, v in dm_to_mx.items()}
-            print(f"[retarget] Convention OSSEUS : Mixamo ({len(osseus_to_dm)} bones mappes)")
-        else:
-            # Convention DeepMotion/JNT — logique originale
-            osseus_to_dm = {v: k for k, v in DM_TO_OSSEUS.items()}
-            dm_bone_set = {b.name for b in dm_arm.data.bones}
-            for bn in dm_bone_set:
-                if bn not in osseus_to_dm.values() and bn not in set(DM_TO_OSSEUS.keys()):
-                    osseus_to_dm.setdefault(bn, bn)
-            print(f"[retarget] Convention OSSEUS : DeepMotion/JNT ({len(osseus_to_dm)} bones mappes)")
-        # Fix #6 : Retargeting par contraintes world-space + nla.bake visual_keying.
-        # La copie directe de matrix_basis echoue si les poses repos des deux armatures
-        # ont des orientations d'os differentes (DM = T-pose MoCap, OSSEUS = bbox analysis).
-        # COPY_ROTATION world→world + visual_keying = Blender calcule la rotation locale
-        # correcte automatiquement, quel que soit l'ecart de pose repos.
-        print("[retarget] Ajout contraintes COPY_ROTATION world→world...")
 
+        # Table complete DM → OSSEUS : mapping explicite + identite pour bones meme nom
+        dm_to_osseus_full = dict(DM_TO_OSSEUS)
+        for bn in {b.name for b in dm_arm.data.bones}:
+            if bn not in dm_to_osseus_full and bn in osseus_bone_names_set:
+                dm_to_osseus_full[bn] = bn
+
+        print(f"[retarget] Mapping total : {len(dm_to_osseus_full)} bones")
+
+        # Forcer QUATERNION sur tous les bones OSSEUS
         for pb in osseus_arm.pose.bones:
             pb.rotation_mode = "QUATERNION"
-            dm_name = osseus_to_dm.get(pb.name, pb.name)
-            if dm_arm.pose.bones.get(dm_name) is None:
+
+        new_action = bpy.data.actions.new(name="DEEPMOTION_Animation")
+        osseus_arm.animation_data_create()
+        osseus_arm.animation_data.action = new_action
+
+        fcurves_copies  = 0
+        fcurves_skipped = 0
+
+        for fc in dm_action.fcurves:
+            # Extraire le nom du bone depuis 'pose.bones["name"].channel'
+            if '["' not in fc.data_path:
                 continue
-            cr = pb.constraints.new("COPY_ROTATION")
-            cr.name = "FERRUS_ROT"
-            cr.target = dm_arm
-            cr.subtarget = dm_name
-            cr.target_space = "WORLD"
-            cr.owner_space = "WORLD"
-            cr.mix_mode = "REPLACE"
+            start = fc.data_path.index('["') + 2
+            end   = fc.data_path.index('"]', start)
+            dm_bn = fc.data_path[start:end]
 
-            if pb.parent is None:
-                cl = pb.constraints.new("COPY_LOCATION")
-                cl.name = "FERRUS_LOC"
-                cl.target = dm_arm
-                cl.subtarget = dm_name
-                cl.target_space = "WORLD"
-                cl.owner_space = "WORLD"
+            osseus_bn = dm_to_osseus_full.get(dm_bn)
+            if osseus_bn is None or osseus_bn not in osseus_bone_names_set:
+                fcurves_skipped += 1
+                continue
 
-        print(f"[retarget] Bake contraintes (frames {frame_start}→{frame_end}) via nla.bake...")
-        bpy.context.view_layer.objects.active = osseus_arm
-        bpy.ops.object.select_all(action="DESELECT")
-        osseus_arm.select_set(True)
-        bpy.ops.object.mode_set(mode="POSE")
-        bpy.ops.pose.select_all(action="SELECT")
+            new_dp = fc.data_path.replace(f'["{dm_bn}"]', f'["{osseus_bn}"]')
+            new_fc = new_action.fcurves.new(data_path=new_dp, index=fc.array_index)
+            new_fc.keyframe_points.add(len(fc.keyframe_points))
+            for i, kp in enumerate(fc.keyframe_points):
+                new_fc.keyframe_points[i].co            = kp.co
+                new_fc.keyframe_points[i].interpolation  = kp.interpolation
+                new_fc.keyframe_points[i].handle_left    = kp.handle_left
+                new_fc.keyframe_points[i].handle_right   = kp.handle_right
+            new_fc.update()
+            fcurves_copies += 1
 
-        scene.frame_start = frame_start
-        scene.frame_end   = frame_end
-
-        bpy.ops.nla.bake(
-            frame_start=frame_start,
-            frame_end=frame_end,
-            step=1,
-            only_selected=False,
-            visual_keying=True,
-            clear_constraints=True,
-            clear_parents=False,
-            use_current_action=False,
-            bake_types={"POSE"},
-        )
-
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-        new_action = osseus_arm.animation_data.action if osseus_arm.animation_data else None
-        fcurves_copies = len(new_action.fcurves) if new_action else 0
-        print(f"[retarget] FCurves bakees : {fcurves_copies}")
+        print(f"[retarget] FCurves copiees : {fcurves_copies} | ignorees : {fcurves_skipped}")
 
         # 5. Supprimer l'armature DeepMotion et les cameras
         bpy.data.objects.remove(dm_arm, do_unlink=True)
