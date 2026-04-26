@@ -567,47 +567,60 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
                 if bn not in osseus_to_dm.values() and bn not in set(DM_TO_OSSEUS.keys()):
                     osseus_to_dm.setdefault(bn, bn)
             print(f"[retarget] Convention OSSEUS : DeepMotion/JNT ({len(osseus_to_dm)} bones mappes)")
-        print("[retarget] Bake frame-par-frame DeepMotion → OSSEUS...")
+        # Fix #6 : Retargeting par contraintes world-space + nla.bake visual_keying.
+        # La copie directe de matrix_basis echoue si les poses repos des deux armatures
+        # ont des orientations d'os differentes (DM = T-pose MoCap, OSSEUS = bbox analysis).
+        # COPY_ROTATION world→world + visual_keying = Blender calcule la rotation locale
+        # correcte automatiquement, quel que soit l'ecart de pose repos.
+        print("[retarget] Ajout contraintes COPY_ROTATION world→world...")
 
         for pb in osseus_arm.pose.bones:
             pb.rotation_mode = "QUATERNION"
+            dm_name = osseus_to_dm.get(pb.name, pb.name)
+            if dm_arm.pose.bones.get(dm_name) is None:
+                continue
+            cr = pb.constraints.new("COPY_ROTATION")
+            cr.name = "FERRUS_ROT"
+            cr.target = dm_arm
+            cr.subtarget = dm_name
+            cr.target_space = "WORLD"
+            cr.owner_space = "WORLD"
+            cr.mix_mode = "REPLACE"
 
-        new_action = bpy.data.actions.new(name="DEEPMOTION_Baked")
-        osseus_arm.animation_data_create()
-        osseus_arm.animation_data.action = new_action
+            if pb.parent is None:
+                cl = pb.constraints.new("COPY_LOCATION")
+                cl.name = "FERRUS_LOC"
+                cl.target = dm_arm
+                cl.subtarget = dm_name
+                cl.target_space = "WORLD"
+                cl.owner_space = "WORLD"
 
-        # Matrice de conversion espace DM → espace OSSEUS (une seule fois, hors boucle).
-        # Apres transform_apply sur OSSEUS, osseus_arm.matrix_world ≈ identite,
-        # donc dm_to_osseus ≈ dm_arm.matrix_world.
-        # Cela corrige le mismatch d'axes entre les deux armatures.
-        dm_to_osseus = osseus_arm.matrix_world.inverted() @ dm_arm.matrix_world
+        print(f"[retarget] Bake contraintes (frames {frame_start}→{frame_end}) via nla.bake...")
+        bpy.context.view_layer.objects.active = osseus_arm
+        bpy.ops.object.select_all(action="DESELECT")
+        osseus_arm.select_set(True)
+        bpy.ops.object.mode_set(mode="POSE")
+        bpy.ops.pose.select_all(action="SELECT")
 
-        for frame in range(frame_start, frame_end + 1):
-            scene.frame_set(frame)
-            bpy.context.view_layer.update()
+        scene.frame_start = frame_start
+        scene.frame_end   = frame_end
 
-            for pb in osseus_arm.pose.bones:
-                dm_name = osseus_to_dm.get(pb.name, pb.name)
-                dm_pb = dm_arm.pose.bones.get(dm_name)
-                if dm_pb is None:
-                    continue
-                # Fix #3 : decompose() gere correctement les matrices avec scale non-unitaire.
-                # to_quaternion() direct sur Matrix4x4 echoue si scale != 1.
-                _, rot, _ = dm_pb.matrix_basis.decompose()
-                pb.rotation_quaternion = rot
-                pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+        bpy.ops.nla.bake(
+            frame_start=frame_start,
+            frame_end=frame_end,
+            step=1,
+            only_selected=False,
+            visual_keying=True,
+            clear_constraints=True,
+            clear_parents=False,
+            use_current_action=False,
+            bake_types={"POSE"},
+        )
 
-                if pb.parent is None:  # Root bone : location aussi
-                    # Fix #5 : DELTA depuis rest position — evite la levitation.
-                    # pb.location est un OFFSET depuis rest (pas une position absolue).
-                    # Conversion via espace monde pour gerer rotation/scale objet.
-                    dm_rest_world = dm_arm.matrix_world @ dm_arm.data.bones[dm_pb.name].head_local
-                    dm_pose_world = (dm_arm.matrix_world @ dm_pb.matrix).translation
-                    delta_world   = dm_pose_world - dm_rest_world
-                    pb.location   = osseus_arm.matrix_world.to_3x3().inverted() @ delta_world
-                    pb.keyframe_insert(data_path="location", frame=frame)
+        bpy.ops.object.mode_set(mode="OBJECT")
 
-        fcurves_copies = len(new_action.fcurves)
+        new_action = osseus_arm.animation_data.action if osseus_arm.animation_data else None
+        fcurves_copies = len(new_action.fcurves) if new_action else 0
         print(f"[retarget] FCurves bakees : {fcurves_copies}")
 
         # 5. Supprimer l'armature DeepMotion et les cameras
