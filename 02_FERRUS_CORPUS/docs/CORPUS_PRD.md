@@ -1,16 +1,15 @@
 # CORPUS_PRD.md — Bible Technique
 # FREGATE 02 : FERRUS CORPUS
-# Version : 1.0 | Date : 2026-04-18 | Statut : VALIDE
+# Version : 2.0 | Date : 2026-04-26 | Statut : REFONTE VALIDEE
 
 ---
 
 ## I. VISION IMPERIALE
 
-Prendre les squelettes R15 animes produits par FERRUS ANIMUS (FBX sans mesh, invisibles)
-et les incarner dans un avatar Roblox R15 pour produire des acteurs complets, visibles,
-exploitables en viewer 3D et en production EXODUS.
+Convertir tout fichier `.fbx` ou `.glb` produit par la Flotte en fichier `.blend`
+natif Blender, pret pour EXODUS et les outils de production aval.
 
-**Objectif mesurable :** N FBX R15 Ferrus + 1 avatar_r15.blend → N fichiers corpus_P*.blend + N fichiers corpus_P*.glb
+**Objectif mesurable :** N FBX/GLB dans IN/ → N fichiers corpus_P*.blend dans OUT/
 en moins de 2 minutes, cout zero, sans intervention technique de l'Empereur.
 
 ---
@@ -19,55 +18,32 @@ en moins de 2 minutes, cout zero, sans intervention technique de l'Empereur.
 
 ```
 Drive/FLOTTE-FERRUS/02_FERRUS_CORPUS/
-  IN/          <- Entree : ferrus_P*.fbx depuis 01_FERRUS_ANIMUS/OUT/
-  IN_AVATAR/   <- Entree : avatar_r15.blend (depose une fois)
-  OUT/         <- Sortie : corpus_P*.blend + corpus_P*.glb + rapport_corpus.json
+  IN/    <- Entree : ferrus_P*.fbx ou *.glb (depuis 01_FERRUS_ANIMUS/OUT/ ou autre)
+  OUT/   <- Sortie : corpus_P*.blend + rapport_corpus.json
 ```
 
-Rien ne traverse la coque sans passer par ces trois portes.
+Rien ne traverse la coque sans passer par ces deux portes.
 
 ---
 
-## III. ARCHITECTURE — LA LOGIQUE D'INCARNATION
+## III. ARCHITECTURE — CONVERSION PURE
 
-### Pourquoi ca marche sans mapping
-
-FERRUS ANIMUS produit des FBX avec 15 bones nommes selon la convention Roblox R15 :
-`LowerTorso`, `UpperTorso`, `Head`, `LeftUpperArm`, `RightUpperArm`...
-
-L'avatar Roblox `.blend` possede une armature avec les MEMES noms de bones.
-
-```
-FBX Ferrus        Avatar Roblox blend
-──────────────    ────────────────────
-LowerTorso    →   LowerTorso     ✓
-UpperTorso    →   UpperTorso     ✓
-Head          →   Head           ✓
-LeftUpperArm  →   LeftUpperArm   ✓
-...           →   ...            ✓
-```
-
-Transfert direct bone-to-bone par nom. Zero couche de mapping. Zero risque d'erreur.
-
-### Pipeline d'Incarnation
+### Pipeline de Conversion
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                 CORPUS PIPELINE                        │
 ├────────────────────────────────────────────────────────┤
 │                                                        │
-│  GLOB ferrus_P*.fbx dans IN/                          │
+│  GLOB ferrus_P*.fbx / ferrus_P*.glb dans IN/          │
 │         │                                              │
-│         ▼  (pour chaque FBX)                          │
+│         ▼  (pour chaque fichier)                       │
 │                                                        │
-│  1. Charger avatar_r15.blend (armature + mesh)        │
-│  2. Importer ferrus_PN.fbx → armature temporaire      │
-│  3. Extraire l'Action (animation) de l'armature FBX   │
-│  4. Appliquer l'Action sur l'armature avatar           │
-│     (bones memes noms → affectation directe)          │
-│  5. Export corpus_PN.blend (MASTER)                   │
-│  6. Export corpus_PN.glb (PREVIEW)                    │
-│  7. Logger dans rapport_corpus.json                   │
+│  1. bpy.ops.wm.read_factory_settings(use_empty=True)  │
+│  2. Import FBX → bpy.ops.import_scene.fbx()           │
+│     Import GLB → bpy.ops.import_scene.gltf()          │
+│  3. bpy.ops.wm.save_as_mainfile(filepath=output_blend)│
+│  4. Logger dans rapport_corpus.json                   │
 │                                                        │
 │  FIN boucle → rapport_corpus.json finalise            │
 └────────────────────────────────────────────────────────┘
@@ -77,27 +53,23 @@ Transfert direct bone-to-bone par nom. Zero couche de mapping. Zero risque d'err
 
 ## IV. MODULES
 
-### inject_animation.py — Coeur du Systeme
+### convert_to_blend.py — Coeur du Systeme
 
-Execute via : `blender --background --python inject_animation.py -- [args]`
+Execute via : `blender --background --python convert_to_blend.py -- [args]`
 
 **Arguments :**
 
 | Argument | Description |
 |---|---|
-| `--fbx` | Chemin absolu du FBX Ferrus |
-| `--avatar` | Chemin absolu de avatar_r15.blend |
+| `--input` | Chemin absolu du fichier FBX ou GLB |
 | `--output-blend` | Chemin de sortie .blend |
-| `--output-glb` | Chemin de sortie .glb |
+| `--report-json` | Chemin du rapport JSON (optionnel) |
 
 **Logique interne :**
-1. `bpy.ops.wm.read_factory_settings(use_empty=True)`
-2. `bpy.ops.wm.open_mainfile(filepath=avatar_blend)` — charge le mesh + armature
-3. `bpy.ops.import_scene.fbx(filepath=fbx_path)` — importe l'armature FBX
-4. Recupere l'action de l'armature FBX importee
-5. Assigne l'action a l'armature avatar via `animation_data.action`
-6. `bpy.ops.export_scene.gltf(filepath=output_glb)` — export GLB
-7. `bpy.ops.wm.save_as_mainfile(filepath=output_blend)` — export BLEND
+1. `bpy.ops.wm.read_factory_settings(use_empty=True)` — scene vide
+2. Detection format : `.fbx` → `import_scene.fbx` / `.glb` → `import_scene.gltf`
+3. `bpy.ops.wm.save_as_mainfile(filepath=output_blend)` — export .blend
+4. Logger : nom fichier, format source, statut, taille output
 
 ### corpus_main.ipynb — Notebook Colab
 
@@ -106,34 +78,21 @@ Execute via : `blender --background --python inject_animation.py -- [args]`
 | # | Nom | Role |
 |---|---|---|
 | 1 | SETUP | Monte Drive, definit chemins, verifie Blender |
-| 2 | CONFIG | Liste les FBX disponibles dans IN/, valide avatar |
-| 3 | INCARNATION | Boucle sur N FBX, appelle inject_animation.py |
+| 2 | CONFIG | Liste les FBX/GLB disponibles dans IN/ |
+| 3 | CONVERSION | Boucle sur N fichiers, appelle convert_to_blend.py |
 | 4 | RAPPORT | Charge et affiche rapport_corpus.json |
-| 5 | PREVIEW | Affiche taille et checksum des .glb produits |
 
 ---
 
 ## V. INPUTS REQUIS
 
-### ferrus_P*.fbx (depuis Fregate 01)
+### ferrus_P*.fbx ou ferrus_P*.glb (depuis Fregate 01 ou autre source)
 
 | Propriete | Valeur attendue |
 |---|---|
-| Format | FBX Binary (Kaydara) |
-| Bones | 15 bones R15 |
-| Naming | LowerTorso, UpperTorso, Head... |
-| Animation | KeyTime present, 1 AnimationStack |
-| Mesh | ABSENT (squelette pur) |
-
-### avatar_r15.blend
-
-| Propriete | Valeur requise |
-|---|---|
-| Format | Blender .blend (version 4.x recommandee) |
-| Armature | R15 — memes noms que Ferrus |
-| Mesh | Present (corps Roblox attache a l'armature) |
-| Materiau | Optionnel (si absent : sans texture dans le GLB) |
-| Shape Keys | Optionnel (non utilisees en Fregate 02) |
+| Format | FBX Binary ou GLB (glTF 2.0) |
+| Contenu | Mesh, armature, animation — tout est accepte |
+| Naming | ferrus_P*.fbx / ferrus_P*.glb (convention Flotte) |
 
 ---
 
@@ -141,33 +100,24 @@ Execute via : `blender --background --python inject_animation.py -- [args]`
 
 ### corpus_PN.blend (MASTER)
 
-- Avatar complet (armature + mesh) avec animation
-- Armature R15 native Blender
-- Action NLA assignee
-- Pret pour import dans EXODUS U01 (01_ANIMATION_ENGINE/IN_MIXAMO_BASE/)
-
-### corpus_PN.glb (PREVIEW)
-
-- Format glTF Binary
-- Lisible dans tout viewer moderne
-- Contient : mesh + armature + animation
-- Viewable sur : gltf-viewer.donmccurdy.com, modelviewer.dev
+- Contenu intact du fichier source (mesh, armature, animation)
+- Format Blender natif 4.x
+- Pret pour import dans EXODUS
 
 ### rapport_corpus.json
 
 ```json
 {
-  "generated_at": "2026-04-18T00:00:00",
+  "generated_at": "2026-04-26T00:00:00",
   "blender_version": "4.x",
-  "total_actors": 2,
-  "actors": [
+  "total_files": 2,
+  "files": [
     {
       "id": "P1",
-      "fbx_source": "ferrus_P1.fbx",
-      "bones_transferred": 15,
-      "frames": 427,
+      "source": "ferrus_P1.fbx",
+      "format": "FBX",
       "output_blend": "corpus_P1.blend",
-      "output_glb": "corpus_P1.glb",
+      "size_bytes": 1024000,
       "status": "OK"
     }
   ]
@@ -185,17 +135,17 @@ Execute via : `blender --background --python inject_animation.py -- [args]`
 | Blender | 4.x headless uniquement |
 | Dependances Python | bpy uniquement (zero pip) |
 | Cout | Zero euro |
-| Temps par acteur | < 1 minute (CPU, mesh simple) |
+| Temps par fichier | < 30 secondes (CPU) |
 
 ---
 
 ## VIII. LIMITES DE LA FREGATE
 
-- Fregate 02 NE fait PAS d'animation faciale (shape keys ARKit) — c'est le role de EXODUS U01
-- Fregate 02 NE fait PAS de retargeting complexe — les bones ont les memes noms
-- Fregate 02 NE genere PAS l'avatar — l'utilisateur fournit avatar_r15.blend
-- Fregate 02 NE produit PAS de rendu — juste le .blend et le .glb
+- Fregate 02 NE fait PAS de retargeting ou manipulation d'animation
+- Fregate 02 NE fait PAS de mapping de bones
+- Fregate 02 NE fait PAS de rendu
+- Fregate 02 NE valide PAS le contenu du fichier source — elle convertit, c'est tout
 
 ---
 
-*EXODUS SYSTEM — Fregate 02_FERRUS_CORPUS v1.0.0*
+*EXODUS SYSTEM — Fregate 02_FERRUS_CORPUS v2.0.0*
