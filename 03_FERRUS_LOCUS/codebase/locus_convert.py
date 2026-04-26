@@ -243,6 +243,7 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     nt.links.new(img_tex_node.outputs['Color'],      bsdf_node.inputs['Base Color'])
     nt.links.new(bsdf_node.outputs['BSDF'],          out_glb_node.inputs['Surface'])
 
+    mat.use_backface_culling = False  # double face — visible de l interieur
     print("[LOCUS][BAKE] Materiau recable : PrincipledBSDF + UVMap + texture bakee.")
     # ────────────────────────────────────────────────────────────
 
