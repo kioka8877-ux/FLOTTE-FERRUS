@@ -24,39 +24,30 @@ import subprocess
 try:
     import numpy
 except ImportError:
-    print("[OSSEUS] numpy absent — recherche chemin systeme...")
-    # sys.executable = /usr/bin/python3.10 sans pip dans cet env.
-    # On cherche numpy via pip3/pip du systeme et on ajoute son site-packages a sys.path.
-    _found = False
-    for _pip in ["pip3", "pip", "/usr/bin/pip3", "/usr/local/bin/pip3"]:
-        _r = subprocess.run([_pip, "show", "numpy"],
-                            capture_output=True, text=True)
-        if _r.returncode == 0:
-            for _line in _r.stdout.split("\n"):
-                if _line.startswith("Location:"):
-                    _site = _line.split(":", 1)[1].strip()
-                    if _site not in sys.path:
-                        sys.path.insert(0, _site)
-                    _found = True
-                    break
-            if _found:
-                break
-    if not _found:
-        # Fallback : ajouter les chemins site-packages communs sous Colab
-        for _p in [
-            "/usr/local/lib/python3.10/dist-packages",
-            "/usr/local/lib/python3.9/dist-packages",
-            "/usr/lib/python3/dist-packages",
-        ]:
-            if _p not in sys.path:
-                sys.path.insert(0, _p)
+    print("[OSSEUS] numpy absent — recherche chemin Python compatible...")
+    # Blender utilise Python 3.10 (/usr/bin/python3.10).
+    # On cherche numpy compile pour la meme version (pas cp312 incompatible).
+    _pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    _candidates = [
+        f"/usr/local/lib/{_pyver}/dist-packages",
+        f"/usr/local/lib/{_pyver}/site-packages",
+        f"/usr/lib/{_pyver}/dist-packages",
+        f"/usr/lib/{_pyver}/site-packages",
+        "/usr/share/blender/scripts/modules",   # injection C3
+    ]
+    for _p in _candidates:
+        _numpy_dir = os.path.join(_p, "numpy")
+        if os.path.isdir(_numpy_dir) and _p not in sys.path:
+            sys.path.insert(0, _p)
+            print(f"[OSSEUS] numpy chemin : {_p}")
+            break
     try:
         import numpy
-        print(f"[OSSEUS] numpy trouve : {numpy.__version__}")
+        print(f"[OSSEUS] numpy {numpy.__version__} OK.")
     except ImportError:
         raise RuntimeError(
-            "numpy introuvable dans sys.path. "
-            "Verifier que numpy est installe dans l'environnement Colab (pip install numpy)."
+            f"numpy introuvable pour {_pyver}. "
+            "Relancer C3 du notebook pour injecter le wheel cp310."
         )
 
 import bpy
