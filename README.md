@@ -51,9 +51,10 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 |---|---|---|
 | 00 | FERRUS FORGE | OPERATIONNELLE - Validation imperiale 2026-04-18 |
 | 01 | FERRUS ANIMUS | OPERATIONNELLE - Pipeline complet livre |
-| 02 | FERRUS CORPUS | EN DEVELOPPEMENT - Refonte mission v2.0 |
+| 02 | FERRUS CORPUS | OPERATIONNELLE - Validation imperiale 2026-04-26 |
 | 03 | FERRUS LOCUS | EN ATTENTE DE DECRET IMPERIAL |
 | 04 | FERRUS OSSEUS | OPERATIONNELLE - Validation imperiale 2026-04-24 |
+| 05 | FERRUS ORBIS | EN DEVELOPPEMENT - Fondation 2026-04-26 |
 
 ---
 
@@ -171,6 +172,34 @@ mesh_T-pose.glb  →  [OSSEUS]  →  osseus_avatar.fbx (mesh + squelette 52 bone
   IN/    <- mesh T-pose brut
   OUT/   <- osseus_avatar.fbx
   docs/OSSEUS_STATE.md
+```
+
+---
+
+---
+
+## Fregate 05 - FERRUS ORBIS
+
+**Mission :** Extraire un decor 3D depuis le marketplace Roblox via API HTTP,
+le nettoyer et l'exporter en `.glb` pret pour ANIMUS + EXODUS.
+
+```
+keyword "brookhaven street"  ┐
+   OU                         │  →  [ORBIS]  →  decor_XXXX.glb (mesh + textures + double face)
+asset_id 12345678            ┘
+```
+
+### Structure
+
+```
+05_FERRUS_ORBIS/
+  codebase/
+    orbis_core.py      <- Script Blender headless (coeur)
+    orbis_main.ipynb   <- Notebook Colab
+    docs/
+      ORBIS_STATE.md / ORBIS_PRD.md / ORBIS_ROADMAP.md / ORBIS_VALIDATION.md
+  IN/    <- keyword.txt ou asset_id.txt
+  OUT/   <- decor_<asset_id>.glb + rapport_orbis.json
 ```
 
 ---
