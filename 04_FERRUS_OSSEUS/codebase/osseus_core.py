@@ -496,7 +496,7 @@ def parent_with_auto_weights(mesh_obj: bpy.types.Object,
 def export_fbx(mesh_obj: bpy.types.Object,
                arm_obj:  bpy.types.Object,
                output_path: str) -> float:
-    """Exporte le mesh rige en FBX. Retourne la taille en Mo."""
+    """Exporte le mesh rige en FBX avec textures embeddees. Retourne la taille en Mo."""
     bpy.ops.object.select_all(action="DESELECT")
     mesh_obj.select_set(True)
     arm_obj.select_set(True)
@@ -505,6 +505,17 @@ def export_fbx(mesh_obj: bpy.types.Object,
     out_dir = os.path.dirname(os.path.abspath(output_path))
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
+
+    # Deballer les images packees sur disque avant export
+    # (Blender importe les textures FBX/GLB en mode "packed" — memoire uniquement)
+    # Sans cette etape, embed_textures ne trouve pas les fichiers source
+    for img in bpy.data.images:
+        if img.packed_file:
+            unpack_path = os.path.join(out_dir, bpy.path.clean_name(img.name) + ".png")
+            img.filepath_raw = unpack_path
+            img.file_format  = "PNG"
+            img.unpack(method="WRITE_LOCAL")
+            print(f"[OSSEUS][EXPORT] Texture deballee : {img.name}")
 
     bpy.ops.export_scene.fbx(
         filepath=output_path,
@@ -515,7 +526,7 @@ def export_fbx(mesh_obj: bpy.types.Object,
         mesh_smooth_type="FACE",
         use_armature_deform_only=False,
         path_mode="COPY",
-        embed_textures=False,
+        embed_textures=True,        # Textures embeddees dans le binaire FBX (self-contained)
         global_scale=1.0,
         axis_forward="-Z",
         axis_up="Y",

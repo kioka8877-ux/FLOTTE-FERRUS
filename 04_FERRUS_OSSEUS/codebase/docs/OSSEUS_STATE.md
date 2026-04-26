@@ -86,6 +86,7 @@
 |------|-----------|
 | 2026-04-24 | Creation de la fregate, livraison complete |
 | 2026-04-24 | Validation en production — 2/2 avatars GLB → FBX R15 OK |
+| 2026-04-26 | BUG FIX — Textures perdues sur FBX Hunyuan : embed_textures=False → True + unpack images avant export |
 
 ---
 
