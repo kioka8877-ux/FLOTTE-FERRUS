@@ -239,7 +239,6 @@ def op_seal_export(obj: bpy.types.Object, output_path: str):
         export_texcoords=True,
         export_normals=True,
         export_materials='EXPORT',
-        export_colors=True,
     )
 
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
