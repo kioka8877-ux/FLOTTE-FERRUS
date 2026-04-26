@@ -324,22 +324,16 @@ def _transfer_animation(scene, dm_armature, target_armature,
     return frames_done
 
 
-# ══ Mode DEEPMOTION — copy directe FCurves ════════════════════════════════════
+# ══ Mode DEEPMOTION — copy directe FCurves (reference, non utilisee) ══════════
 
 def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
     """
-    Copie les FCurves de l'action DeepMotion vers une nouvelle action
-    sur l'armature OSSEUS. Fonctionne car les bones ont exactement les
-    memes noms dans les deux squelettes (52 bones DeepMotion).
-
-    Force les rotations en quaternion sur tous les bones OSSEUS.
-
-    Returns:
-        Nombre de FCurves copiees.
+    [REFERENCE — non utilisee dans run()] Copie directe FCurves DM → OSSEUS.
+    Conservee pour documentation. Produit le bug Superman (mismatch axes Y-up/Z-up).
+    Utiliser _retarget_via_constraints a la place.
     """
     import bpy
 
-    # Forcer quaternion sur tous les bones OSSEUS
     for pb in osseus_arm.pose.bones:
         pb.rotation_mode = "QUATERNION"
 
@@ -351,8 +345,6 @@ def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
 
     copied = 0
     for fc in dm_action.fcurves:
-        # Trouver le bone reference dans le data_path
-        # Format : 'pose.bones["bone_name"].rotation_quaternion'
         bone_name = None
         for bn in osseus_bone_names:
             if f'"{bn}"' in fc.data_path:
@@ -360,7 +352,7 @@ def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
                 break
 
         if bone_name is None:
-            continue  # FCurve ne correspond a aucun bone OSSEUS
+            continue
 
         new_fc = new_action.fcurves.new(
             data_path=fc.data_path,
@@ -376,6 +368,103 @@ def _copy_fcurves_direct(dm_action, osseus_arm) -> int:
         copied += 1
 
     return copied
+
+
+# ══ Mode DEEPMOTION — retargeting via contraintes + bake (FIX Superman) ═══════
+
+def _retarget_via_constraints(scene, dm_arm, osseus_arm, dm_to_osseus_full: dict,
+                               root_dm_name: str,
+                               frame_start: int, frame_end: int) -> int:
+    """
+    Transfere l'animation DM → OSSEUS via contraintes COPY_ROTATION/COPY_LOCATION + bake.
+
+    Corrige le bug Superman (mismatch axes locaux Y-up DM / Z-up OSSEUS).
+    La copie directe de FCurves transfere des valeurs de rotation locale incompatibles.
+    Ici, Blender evalue la pose world-space a chaque frame et calcule automatiquement
+    la rotation locale correcte pour chaque bone OSSEUS.
+
+    Principes :
+    - COPY_ROTATION target_space=WORLD / owner_space=WORLD : copie l'orientation absolue
+    - visual_keying=True : bake capture la pose avec contraintes, pas les valeurs brutes
+    - clear_constraints=True : supprime les contraintes apres le bake
+    - Sans transform_apply : bind pose intact → mesh reste visible
+
+    Returns:
+        Nombre de FCurves dans l'action bakee.
+    """
+    import bpy
+
+    osseus_bone_names = {b.name for b in osseus_arm.data.bones}
+
+    # Forcer QUATERNION sur tous les bones OSSEUS avant le bake
+    for pb in osseus_arm.pose.bones:
+        pb.rotation_mode = "QUATERNION"
+
+    # S'assurer que l'animation data existe sur OSSEUS
+    osseus_arm.animation_data_create()
+
+    constraints_added = 0
+
+    for dm_bn, osseus_bn in dm_to_osseus_full.items():
+        if osseus_bn not in osseus_bone_names:
+            continue
+        osseus_pb = osseus_arm.pose.bones.get(osseus_bn)
+        dm_pb     = dm_arm.pose.bones.get(dm_bn)
+        if osseus_pb is None or dm_pb is None:
+            continue
+
+        # COPY_ROTATION world→world : Blender recalcule la rotation locale exacte
+        # pour le bone OSSEUS — elimine le mismatch d'axes locaux DM/OSSEUS.
+        cr             = osseus_pb.constraints.new("COPY_ROTATION")
+        cr.name        = "FERRUS_ROT"
+        cr.target      = dm_arm
+        cr.subtarget   = dm_bn
+        cr.target_space = "WORLD"
+        cr.owner_space  = "WORLD"
+        constraints_added += 1
+
+        # Bone racine : transfert de position aussi
+        if dm_bn == root_dm_name:
+            cl              = osseus_pb.constraints.new("COPY_LOCATION")
+            cl.name         = "FERRUS_LOC"
+            cl.target       = dm_arm
+            cl.subtarget    = dm_bn
+            cl.target_space = "WORLD"
+            cl.owner_space  = "WORLD"
+
+    print(f"[retarget] Contraintes posees : {constraints_added} bones")
+
+    # Selectionner osseus_arm et entrer en pose mode pour le bake
+    bpy.ops.object.select_all(action="DESELECT")
+    osseus_arm.select_set(True)
+    bpy.context.view_layer.objects.active = osseus_arm
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.select_all(action="SELECT")
+
+    scene.frame_start = frame_start
+    scene.frame_end   = frame_end
+
+    # Bake : visual_keying=True capture la pose avec contraintes appliquees,
+    # clear_constraints=True les supprime automatiquement apres le bake.
+    bpy.ops.nla.bake(
+        frame_start       = frame_start,
+        frame_end         = frame_end,
+        step              = 1,
+        only_selected     = True,
+        visual_keying     = True,
+        clear_constraints = True,
+        clear_parents     = False,
+        use_current_action= False,
+        bake_types        = {"POSE"},
+    )
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    baked_action  = osseus_arm.animation_data.action if osseus_arm.animation_data else None
+    fcurves_count = len(baked_action.fcurves) if baked_action else 0
+    print(f"[retarget] Bake termine : {fcurves_count} FCurves sur "
+          f"{frame_end - frame_start + 1} frames")
+    return fcurves_count
 
 
 # ══ Injection mesh OSSEUS (R15 / MIXAMO) ══════════════════════════════════════
@@ -469,7 +558,7 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
     print(f"[retarget] === FERRUS ANIMUS — MODE {mode} ===")
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # MODE DEEPMOTION — transfert direct FCurves (meme squelette 52 bones)
+    # MODE DEEPMOTION — contraintes COPY_ROTATION + bake (FIX Superman)
     # ═══════════════════════════════════════════════════════════════════════════
     if mode == "DEEPMOTION":
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -498,14 +587,14 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
               f"{len(osseus_arm.data.bones)} bones, "
               f"{len(mesh_objects)} mesh(es)")
 
-        # transform_apply supprime — corrompt le bind pose FBX (mesh et armature
-        # se retrouvaient dans des espaces differents apres apply).
+        # Sans transform_apply — corrige le bug mesh invisible.
+        # transform_apply corrompait le bind pose FBX : mesh et armature se retrouvaient
+        # dans des espaces differents apres apply → mesh invisible.
         # Les contraintes COPY_ROTATION world→world + visual_keying gerent la
-        # conversion d'espace automatiquement.
+        # conversion d'espace automatiquement sans toucher au bind pose.
 
         # 2. Charger le FBX DeepMotion corrige (animation)
         print(f"[retarget] Chargement DeepMotion : {fbx_in}")
-        existing_before = set(scene.objects)
         bpy.ops.import_scene.fbx(filepath=os.path.abspath(fbx_in), **FBX_IMPORT_PARAMS)
 
         dm_arm = next(
@@ -536,17 +625,18 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         if absents_osseus:
             print(f"[retarget] {len(absents_osseus)} bones DeepMotion absents dans OSSEUS "
-                  f"(FCurves ignorees) : {sorted(absents_osseus)[:5]}{'...' if len(absents_osseus) > 5 else ''}")
+                  f"(ignores) : {sorted(absents_osseus)[:5]}{'...' if len(absents_osseus) > 5 else ''}")
 
         print(f"[retarget] Bones en commun : {len(communs)}/{len(dm_bones)}")
 
-        # 4. Transfert direct FCurves DM → OSSEUS avec remapping de noms.
-        # Copie les rotations locales DM directement sur les bones OSSEUS.
-        # Fonctionne car OSSEUS (template deepmotion) genere des bones avec les memes
-        # axes locaux que DeepMotion (meme T-pose anatomique, meme head→tail direction).
-        # Zero bake frame-par-frame, zero contrainte — copie exacte des keyframes.
-        print("[retarget] Transfert FCurves direct DM → OSSEUS (remapping noms)...")
-
+        # 4. Retargeting via contraintes COPY_ROTATION + bake.
+        # Remplace la copie directe de FCurves — corrige le bug Superman.
+        # La copie directe transferait les rotations locales DM (Y-up) sur les bones
+        # OSSEUS (Z-up), produisant une bascule de 90° (personnage en position Superman).
+        # La methode contrainte/bake world→world + visual_keying=True fait calculer a
+        # Blender la rotation locale exacte pour chaque bone OSSEUS independamment
+        # des differences d'axes locaux.
+        print("[retarget] Construction mapping DM → OSSEUS...")
         osseus_bone_names_set = {b.name for b in osseus_arm.data.bones}
 
         # Table complete DM → OSSEUS : mapping explicite + identite pour bones meme nom
@@ -557,42 +647,12 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
 
         print(f"[retarget] Mapping total : {len(dm_to_osseus_full)} bones")
 
-        # Forcer QUATERNION sur tous les bones OSSEUS
-        for pb in osseus_arm.pose.bones:
-            pb.rotation_mode = "QUATERNION"
-
-        new_action = bpy.data.actions.new(name="DEEPMOTION_Animation")
-        osseus_arm.animation_data_create()
-        osseus_arm.animation_data.action = new_action
-
-        fcurves_copies  = 0
-        fcurves_skipped = 0
-
-        for fc in dm_action.fcurves:
-            # Extraire le nom du bone depuis 'pose.bones["name"].channel'
-            if '["' not in fc.data_path:
-                continue
-            start = fc.data_path.index('["') + 2
-            end   = fc.data_path.index('"]', start)
-            dm_bn = fc.data_path[start:end]
-
-            osseus_bn = dm_to_osseus_full.get(dm_bn)
-            if osseus_bn is None or osseus_bn not in osseus_bone_names_set:
-                fcurves_skipped += 1
-                continue
-
-            new_dp = fc.data_path.replace(f'["{dm_bn}"]', f'["{osseus_bn}"]')
-            new_fc = new_action.fcurves.new(data_path=new_dp, index=fc.array_index)
-            new_fc.keyframe_points.add(len(fc.keyframe_points))
-            for i, kp in enumerate(fc.keyframe_points):
-                new_fc.keyframe_points[i].co            = kp.co
-                new_fc.keyframe_points[i].interpolation  = kp.interpolation
-                new_fc.keyframe_points[i].handle_left    = kp.handle_left
-                new_fc.keyframe_points[i].handle_right   = kp.handle_right
-            new_fc.update()
-            fcurves_copies += 1
-
-        print(f"[retarget] FCurves copiees : {fcurves_copies} | ignorees : {fcurves_skipped}")
+        fcurves_copies = _retarget_via_constraints(
+            scene, dm_arm, osseus_arm, dm_to_osseus_full,
+            root_dm_name="Hip",
+            frame_start=frame_start,
+            frame_end=frame_end,
+        )
 
         # 5. Supprimer l'armature DeepMotion et les cameras
         bpy.data.objects.remove(dm_arm, do_unlink=True)
@@ -625,15 +685,16 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
         print(f"[retarget] PIPELINE COMPLET. POUR L'EMPEROR.")
 
         return {
-            "status":              "ok",
-            "mode":                "DEEPMOTION",
-            "fcurves_copies":      fcurves_copies,
-            "bones_communs":       len(communs),
+            "status":               "ok",
+            "mode":                 "DEEPMOTION",
+            "methode":              "contraintes_bake",
+            "fcurves_bakees":       fcurves_copies,
+            "bones_communs":        len(communs),
             "bones_absents_osseus": sorted(absents_osseus),
-            "frames":              nb_frames,
-            "mesh_present":        len(mesh_objects) > 0,
-            "mesh_count":          len(mesh_objects),
-            "fbx_out":             fbx_out,
+            "frames":               nb_frames,
+            "mesh_present":         len(mesh_objects) > 0,
+            "mesh_count":           len(mesh_objects),
+            "fbx_out":              fbx_out,
         }
 
     # ═══════════════════════════════════════════════════════════════════════════
