@@ -24,10 +24,40 @@ import subprocess
 try:
     import numpy
 except ImportError:
-    print("[OSSEUS] numpy absent — installation dans le Python de Blender...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "numpy"],
-                   check=True)
-    print("[OSSEUS] numpy installe.")
+    print("[OSSEUS] numpy absent — recherche chemin systeme...")
+    # sys.executable = /usr/bin/python3.10 sans pip dans cet env.
+    # On cherche numpy via pip3/pip du systeme et on ajoute son site-packages a sys.path.
+    _found = False
+    for _pip in ["pip3", "pip", "/usr/bin/pip3", "/usr/local/bin/pip3"]:
+        _r = subprocess.run([_pip, "show", "numpy"],
+                            capture_output=True, text=True)
+        if _r.returncode == 0:
+            for _line in _r.stdout.split("\n"):
+                if _line.startswith("Location:"):
+                    _site = _line.split(":", 1)[1].strip()
+                    if _site not in sys.path:
+                        sys.path.insert(0, _site)
+                    _found = True
+                    break
+            if _found:
+                break
+    if not _found:
+        # Fallback : ajouter les chemins site-packages communs sous Colab
+        for _p in [
+            "/usr/local/lib/python3.10/dist-packages",
+            "/usr/local/lib/python3.9/dist-packages",
+            "/usr/lib/python3/dist-packages",
+        ]:
+            if _p not in sys.path:
+                sys.path.insert(0, _p)
+    try:
+        import numpy
+        print(f"[OSSEUS] numpy trouve : {numpy.__version__}")
+    except ImportError:
+        raise RuntimeError(
+            "numpy introuvable dans sys.path. "
+            "Verifier que numpy est installe dans l'environnement Colab (pip install numpy)."
+        )
 
 import bpy
 import mathutils
