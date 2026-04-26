@@ -50,7 +50,7 @@ BAKE_RESOLUTION = 2048  # pixels (2048x2048)
 def parse_args():
     parser = argparse.ArgumentParser(description="FERRUS LOCUS — PLY + 360 -> GLB")
     parser.add_argument("--ply",    required=True,  help="Chemin vers le fichier .ply")
-    parser.add_argument("--img360", required=True,  help="Chemin vers l\'image 360 (jpg/png/hdr)")
+    parser.add_argument("--img360", required=True,  help="Chemin vers l'image 360 (jpg/png/hdr)")
     parser.add_argument("--output", required=True,  help="Chemin de sortie .glb")
     parser.add_argument("--decim",  default="auto",
                         choices=["auto", "none", "high", "medium", "low"],
@@ -70,7 +70,7 @@ def parse_args():
 # =============================================================================
 
 def op_mesh_import(ply_path: str) -> bpy.types.Object:
-    """Importe le .ply, nettoie le mesh, retourne l\'objet Blender."""
+    """Importe le .ply, nettoie le mesh, retourne l'objet Blender."""
     print(f"[LOCUS][MESH] Import: {ply_path}")
 
     # Purger la scene par defaut
@@ -82,17 +82,17 @@ def op_mesh_import(ply_path: str) -> bpy.types.Object:
     bpy.context.view_layer.objects.active = obj
 
     # Passer en mode edition pour le nettoyage
-    bpy.ops.object.mode_set(mode=\'EDIT\')
+    bpy.ops.object.mode_set(mode='EDIT')
 
     # Supprimer les vertices isoles
-    bpy.ops.mesh.select_all(action=\'SELECT\')
+    bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.delete_loose()
 
     # Reparer les faces non-manifold (basique)
     bpy.ops.mesh.select_non_manifold()
     bpy.ops.mesh.fill_holes(sides=4)
 
-    bpy.ops.object.mode_set(mode=\'OBJECT\')
+    bpy.ops.object.mode_set(mode='OBJECT')
 
     face_count = len(obj.data.polygons)
     print(f"[LOCUS][MESH] Faces apres import: {face_count:,}")
@@ -124,7 +124,7 @@ def op_decimate(obj: bpy.types.Object, level: str):
         return
 
     face_before = len(obj.data.polygons)
-    mod = obj.modifiers.new(name="LOCUS_Decimate", type=\'DECIMATE\')
+    mod = obj.modifiers.new(name="LOCUS_Decimate", type='DECIMATE')
     mod.ratio = ratio
     bpy.ops.object.modifier_apply(modifier=mod.name)
     face_after = len(obj.data.polygons)
@@ -135,32 +135,32 @@ def op_decimate(obj: bpy.types.Object, level: str):
 # =============================================================================
 
 def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
-    """Projette l\'image 360 sur le mesh via UV baking."""
+    """Projette l'image 360 sur le mesh via UV baking."""
     print(f"[LOCUS][BAKE] Image 360: {img360_path} | Resolution: {bake_res}x{bake_res}")
 
-    # --- Scene world : charger l\'image 360 comme environment ---
+    # --- Scene world : charger l'image 360 comme environment ---
     world = bpy.data.worlds.new("LOCUS_World")
     bpy.context.scene.world = world
     world.use_nodes = True
     wnt = world.node_tree
     wnt.nodes.clear()
 
-    bg_node  = wnt.nodes.new(\'ShaderNodeBackground\')
-    env_node = wnt.nodes.new(\'ShaderNodeTexEnvironment\')
-    out_node = wnt.nodes.new(\'ShaderNodeOutputWorld\')
+    bg_node  = wnt.nodes.new('ShaderNodeBackground')
+    env_node = wnt.nodes.new('ShaderNodeTexEnvironment')
+    out_node = wnt.nodes.new('ShaderNodeOutputWorld')
 
     img360 = bpy.data.images.load(img360_path)
     env_node.image = img360
 
-    wnt.links.new(env_node.outputs[\'Color\'], bg_node.inputs[\'Color\'])
-    wnt.links.new(bg_node.outputs[\'Background\'], out_node.inputs[\'Surface\'])
+    wnt.links.new(env_node.outputs['Color'], bg_node.inputs['Color'])
+    wnt.links.new(bg_node.outputs['Background'], out_node.inputs['Surface'])
 
     # --- UV Map : Smart UV Project ---
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode=\'EDIT\')
-    bpy.ops.mesh.select_all(action=\'SELECT\')
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.02)
-    bpy.ops.object.mode_set(mode=\'OBJECT\')
+    bpy.ops.object.mode_set(mode='OBJECT')
 
     # --- Image cible pour baking ---
     bake_img = bpy.data.images.new("LOCUS_BakeTarget", width=bake_res, height=bake_res)
@@ -174,27 +174,27 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     nt = mat.node_tree
     nt.nodes.clear()
 
-    bsdf_node    = nt.nodes.new(\'ShaderNodeBsdfPrincipled\')
-    out_mat_node = nt.nodes.new(\'ShaderNodeOutputMaterial\')
-    img_node     = nt.nodes.new(\'ShaderNodeTexImage\')
+    bsdf_node    = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    out_mat_node = nt.nodes.new('ShaderNodeOutputMaterial')
+    img_node     = nt.nodes.new('ShaderNodeTexImage')
     img_node.image = bake_img
 
-    nt.links.new(img_node.outputs[\'Color\'], bsdf_node.inputs[\'Base Color\'])
-    nt.links.new(bsdf_node.outputs[\'BSDF\'], out_mat_node.inputs[\'Surface\'])
+    nt.links.new(img_node.outputs['Color'], bsdf_node.inputs['Base Color'])
+    nt.links.new(bsdf_node.outputs['BSDF'], out_mat_node.inputs['Surface'])
 
     # Selectionner le noeud image pour le bake
     img_node.select = True
     nt.nodes.active = img_node
 
     # --- Baking ---
-    bpy.context.scene.render.engine = \'CYCLES\'
-    bpy.context.scene.cycles.device = \'CPU\'
+    bpy.context.scene.render.engine = 'CYCLES'
+    bpy.context.scene.cycles.device = 'CPU'
     bpy.context.scene.cycles.samples = 1  # 1 sample suffit pour bake Emit
     bpy.context.scene.render.bake.use_pass_direct = False
     bpy.context.scene.render.bake.use_pass_indirect = False
 
     print("[LOCUS][BAKE] Baking en cours (CPU)...")
-    bpy.ops.object.bake(type=\'DIFFUSE\')
+    bpy.ops.object.bake(type='DIFFUSE')
     print("[LOCUS][BAKE] Baking termine.")
 
     return bake_img
@@ -207,8 +207,8 @@ def op_seal_export(obj: bpy.types.Object, output_path: str):
     """Verifie le mesh, exporte en .glb."""
     print(f"[LOCUS][SEAL] Export GLB: {output_path}")
 
-    # S\'assurer que seul cet objet est selectionne
-    bpy.ops.object.select_all(action=\'DESELECT\')
+    # S'assurer que seul cet objet est selectionne
+    bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
 
@@ -216,11 +216,11 @@ def op_seal_export(obj: bpy.types.Object, output_path: str):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     bpy.ops.export_scene.gltf(
         filepath=output_path,
-        export_format=\'GLB\',
+        export_format='GLB',
         use_selection=True,
         export_texcoords=True,
         export_normals=True,
-        export_materials=\'EXPORT\',
+        export_materials='EXPORT',
         export_colors=True,
     )
 
@@ -297,7 +297,7 @@ def main():
     finally:
         write_rapport(output_path, rapport)
 
-    print("[LOCUS] PIPELINE COMPLET. POUR L\'EMPEROR.")
+    print("[LOCUS] PIPELINE COMPLET. POUR L'EMPEROR.")
 
 if __name__ == "__main__":
     main()
