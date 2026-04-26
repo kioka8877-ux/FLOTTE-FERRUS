@@ -498,14 +498,10 @@ def run(fbx_in: str, plan_path: str, fbx_out: str,
               f"{len(osseus_arm.data.bones)} bones, "
               f"{len(mesh_objects)} mesh(es)")
 
-        # Normaliser l'espace de l'armature OSSEUS (pas d'animation → safe).
-        # Apres transform_apply, osseus_arm.matrix_world ≈ identite.
-        # Les matrix_basis des bones DeepMotion seront directement comparables.
-        bpy.context.view_layer.objects.active = osseus_arm
-        bpy.ops.object.select_all(action="DESELECT")
-        osseus_arm.select_set(True)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-        print(f"[retarget] OSSEUS transform normalise : {osseus_arm.matrix_world}")
+        # transform_apply supprime — corrompt le bind pose FBX (mesh et armature
+        # se retrouvaient dans des espaces differents apres apply).
+        # Les contraintes COPY_ROTATION world→world + visual_keying gerent la
+        # conversion d'espace automatiquement.
 
         # 2. Charger le FBX DeepMotion corrige (animation)
         print(f"[retarget] Chargement DeepMotion : {fbx_in}")
