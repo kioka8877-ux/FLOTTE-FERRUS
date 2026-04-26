@@ -180,10 +180,11 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     me.update()
     print("[LOCUS][BAKE] UV spherique appliquee.")
 
-    # --- Image cible pour baking ---
+    # --- Image cible pour baking (NON connectee au shader) ---
     bake_img = bpy.data.images.new("LOCUS_BakeTarget", width=bake_res, height=bake_res)
 
-    # --- Materiau avec noeud Image pour recevoir le bake ---
+    # --- Materiau : projection position → TexEnvironment → Emission ---
+    # (type EMIT : pas de circular dependency, capture directe de la couleur)
     mat = bpy.data.materials.new("LOCUS_Mat")
     mat.use_nodes = True
     obj.data.materials.clear()
@@ -192,28 +193,40 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     nt = mat.node_tree
     nt.nodes.clear()
 
-    bsdf_node    = nt.nodes.new('ShaderNodeBsdfPrincipled')
-    out_mat_node = nt.nodes.new('ShaderNodeOutputMaterial')
-    img_node     = nt.nodes.new('ShaderNodeTexImage')
-    img_node.image = bake_img
+    texcoord_node = nt.nodes.new('ShaderNodeTexCoord')
+    normalize_node= nt.nodes.new('ShaderNodeVectorMath')
+    normalize_node.operation = 'NORMALIZE'
+    env_tex_node  = nt.nodes.new('ShaderNodeTexEnvironment')
+    emission_node = nt.nodes.new('ShaderNodeEmission')
+    out_mat_node  = nt.nodes.new('ShaderNodeOutputMaterial')
+    # Noeud bake target — NON connecte, juste selectionne
+    bake_node     = nt.nodes.new('ShaderNodeTexImage')
+    bake_node.image = bake_img
 
-    nt.links.new(img_node.outputs['Color'], bsdf_node.inputs['Base Color'])
-    nt.links.new(bsdf_node.outputs['BSDF'], out_mat_node.inputs['Surface'])
+    env_tex_node.image = img360
 
-    # Selectionner le noeud image pour le bake
-    img_node.select = True
-    nt.nodes.active = img_node
+    # Position objet → normalise → direction spherique → couleur 360
+    nt.links.new(texcoord_node.outputs['Object'],     normalize_node.inputs[0])
+    nt.links.new(normalize_node.outputs['Vector'],    env_tex_node.inputs['Vector'])
+    nt.links.new(env_tex_node.outputs['Color'],       emission_node.inputs['Color'])
+    nt.links.new(emission_node.outputs['Emission'],   out_mat_node.inputs['Surface'])
 
-    # --- Baking ---
+    # Selectionner bake_node comme cible (deconnecte = pas de circular dependency)
+    for n in nt.nodes: n.select = False
+    bake_node.select = True
+    nt.nodes.active = bake_node
+
+    # --- Baking EMIT : capture la couleur emise par le shader ---
     bpy.context.scene.render.engine = 'CYCLES'
     bpy.context.scene.cycles.device = 'CPU'
-    bpy.context.scene.cycles.samples = 1  # 1 sample suffit pour bake Emit
-    bpy.context.scene.render.bake.use_pass_direct = False
-    bpy.context.scene.render.bake.use_pass_indirect = False
+    bpy.context.scene.cycles.samples = 4
 
-    print("[LOCUS][BAKE] Baking en cours (CPU)...")
-    bpy.ops.object.bake(type='DIFFUSE')
+    print("[LOCUS][BAKE] Baking EMIT en cours (CPU)...")
+    bpy.ops.object.bake(type='EMIT')
     print("[LOCUS][BAKE] Baking termine.")
+
+    # Sauvegarder la texture dans le GLB (pack)
+    bake_img.pack()
 
     return bake_img
 
