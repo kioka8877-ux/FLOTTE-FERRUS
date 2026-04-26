@@ -138,119 +138,82 @@ def op_decimate(obj: bpy.types.Object, level: str):
     print(f"[LOCUS][DECIM] {face_before:,} -> {face_after:,} faces (ratio {ratio})")
 
 # =============================================================================
-# OP 2 — BAKE : Projection UV + baking de la texture 360
+# OP 2 — TEXTURE : UV spherique depuis centre bbox + ImageTexture directe
 # =============================================================================
 
 def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
-    """Projette l'image 360 sur le mesh via UV baking."""
-    print(f"[LOCUS][BAKE] Image 360: {img360_path} | Resolution: {bake_res}x{bake_res}")
+    """
+    Projette l'image 360 sur le mesh via UV equirectangulaire.
+    - Centre de projection = centre de la bounding box du mesh (pas l'origine)
+    - Pas de bake Cycles : l'image 360 est branchee directement en ImageTexture
+    - Materiau double face (visible de l'interieur)
+    bake_res conserve pour compatibilite CLI mais non utilise.
+    """
+    print(f"[LOCUS][TEXTURE] Image 360: {img360_path}")
 
-    # --- Scene world : charger l'image 360 comme environment ---
-    world = bpy.data.worlds.new("LOCUS_World")
-    bpy.context.scene.world = world
-    world.use_nodes = True
-    wnt = world.node_tree
-    wnt.nodes.clear()
-
-    bg_node  = wnt.nodes.new('ShaderNodeBackground')
-    env_node = wnt.nodes.new('ShaderNodeTexEnvironment')
-    out_node = wnt.nodes.new('ShaderNodeOutputWorld')
-
-    img360 = bpy.data.images.load(img360_path)
-    env_node.image = img360
-
-    wnt.links.new(env_node.outputs['Color'], bg_node.inputs['Color'])
-    wnt.links.new(bg_node.outputs['Background'], out_node.inputs['Surface'])
-
-    # --- UV Map : projection spherique via bmesh (compatible headless) ---
     import bmesh
+    import mathutils
+
     bpy.context.view_layer.objects.active = obj
     me = obj.data
     bm = bmesh.new()
     bm.from_mesh(me)
+
+    # ── Centre de projection : centre de la bounding box ─────────
+    all_x = [v.co.x for v in bm.verts]
+    all_y = [v.co.y for v in bm.verts]
+    all_z = [v.co.z for v in bm.verts]
+    center = mathutils.Vector((
+        (min(all_x) + max(all_x)) / 2,
+        (min(all_y) + max(all_y)) / 2,
+        (min(all_z) + max(all_z)) / 2,
+    ))
+    print(f"[LOCUS][TEXTURE] Centre projection (bbox): ({center.x:.3f}, {center.y:.3f}, {center.z:.3f})")
+
+    # ── UV Map : projection equirectangulaire depuis le centre ────
     uv_layer = bm.loops.layers.uv.new("UVMap")
     for face in bm.faces:
         for loop in face.loops:
-            co = loop.vert.co.normalized()
-            u = 0.5 + math.atan2(co.x, co.y) / (2 * math.pi)
-            v = 0.5 - math.asin(max(-1.0, min(1.0, co.z))) / math.pi
+            direction = (loop.vert.co - center).normalized()
+            u = 0.5 + math.atan2(direction.x, direction.y) / (2 * math.pi)
+            v = 0.5 - math.asin(max(-1.0, min(1.0, direction.z))) / math.pi
             loop[uv_layer].uv = (u, v)
+
     bm.to_mesh(me)
     bm.free()
     me.update()
-    print("[LOCUS][BAKE] UV spherique appliquee.")
+    print("[LOCUS][TEXTURE] UV equirectangulaire appliquee depuis centre bbox.")
 
-    # --- Image cible pour baking (NON connectee au shader) ---
-    bake_img = bpy.data.images.new("LOCUS_BakeTarget", width=bake_res, height=bake_res)
+    # ── Charger et embarquer l'image 360 ─────────────────────────
+    img360 = bpy.data.images.load(img360_path)
+    img360.pack()
 
-    # --- Materiau : projection position → TexEnvironment → Emission ---
-    # (type EMIT : pas de circular dependency, capture directe de la couleur)
+    # ── Materiau : UVMap → ImageTexture(360) → PrincipledBSDF ────
     mat = bpy.data.materials.new("LOCUS_Mat")
     mat.use_nodes = True
+    mat.use_backface_culling = False  # double face — visible de l'interieur
     obj.data.materials.clear()
     obj.data.materials.append(mat)
 
     nt = mat.node_tree
     nt.nodes.clear()
 
-    texcoord_node = nt.nodes.new('ShaderNodeTexCoord')
-    normalize_node= nt.nodes.new('ShaderNodeVectorMath')
-    normalize_node.operation = 'NORMALIZE'
-    env_tex_node  = nt.nodes.new('ShaderNodeTexEnvironment')
-    emission_node = nt.nodes.new('ShaderNodeEmission')
-    out_mat_node  = nt.nodes.new('ShaderNodeOutputMaterial')
-    # Noeud bake target — NON connecte, juste selectionne
-    bake_node     = nt.nodes.new('ShaderNodeTexImage')
-    bake_node.image = bake_img
+    uv_node  = nt.nodes.new('ShaderNodeUVMap')
+    uv_node.uv_map = "UVMap"
 
-    env_tex_node.image = img360
+    img_node = nt.nodes.new('ShaderNodeTexImage')
+    img_node.image = img360
+    img_node.interpolation = 'Linear'
 
-    # Position objet → normalise → direction spherique → couleur 360
-    nt.links.new(texcoord_node.outputs['Object'],     normalize_node.inputs[0])
-    nt.links.new(normalize_node.outputs['Vector'],    env_tex_node.inputs['Vector'])
-    nt.links.new(env_tex_node.outputs['Color'],       emission_node.inputs['Color'])
-    nt.links.new(emission_node.outputs['Emission'],   out_mat_node.inputs['Surface'])
+    bsdf_node = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    out_node  = nt.nodes.new('ShaderNodeOutputMaterial')
 
-    # Selectionner bake_node comme cible (deconnecte = pas de circular dependency)
-    for n in nt.nodes: n.select = False
-    bake_node.select = True
-    nt.nodes.active = bake_node
+    nt.links.new(uv_node.outputs['UV'],       img_node.inputs['Vector'])
+    nt.links.new(img_node.outputs['Color'],   bsdf_node.inputs['Base Color'])
+    nt.links.new(bsdf_node.outputs['BSDF'],   out_node.inputs['Surface'])
 
-    # --- Baking EMIT : capture la couleur emise par le shader ---
-    bpy.context.scene.render.engine = 'CYCLES'
-    bpy.context.scene.cycles.device = 'CPU'
-    bpy.context.scene.cycles.samples = 4
-
-    print("[LOCUS][BAKE] Baking EMIT en cours (CPU)...")
-    bpy.ops.object.bake(type='EMIT')
-    print("[LOCUS][BAKE] Baking termine.")
-
-    # ── FIX : recabler le materiau pour export GLB ──────────────
-    # Apres bake, remplacer le shader EMIT par PrincipledBSDF + texture bakee + UV
-    # Sans ce recablage, le GLB exporte un mesh noir (bake_node deconnecte)
-    nt.nodes.clear()
-
-    uv_map_node  = nt.nodes.new('ShaderNodeUVMap')
-    uv_map_node.uv_map = "UVMap"
-
-    img_tex_node = nt.nodes.new('ShaderNodeTexImage')
-    img_tex_node.image = bake_img
-
-    bsdf_node    = nt.nodes.new('ShaderNodeBsdfPrincipled')
-    out_glb_node = nt.nodes.new('ShaderNodeOutputMaterial')
-
-    nt.links.new(uv_map_node.outputs['UV'],          img_tex_node.inputs['Vector'])
-    nt.links.new(img_tex_node.outputs['Color'],      bsdf_node.inputs['Base Color'])
-    nt.links.new(bsdf_node.outputs['BSDF'],          out_glb_node.inputs['Surface'])
-
-    mat.use_backface_culling = False  # double face — visible de l interieur
-    print("[LOCUS][BAKE] Materiau recable : PrincipledBSDF + UVMap + texture bakee.")
-    # ────────────────────────────────────────────────────────────
-
-    # Sauvegarder la texture dans le GLB (pack)
-    bake_img.pack()
-
-    return bake_img
+    print("[LOCUS][TEXTURE] Materiau : UV → ImageTexture(360) → PrincipledBSDF. Double face ON.")
+    return img360
 
 # =============================================================================
 # OP 3 — SEAL : Nettoyage final + export GLB
