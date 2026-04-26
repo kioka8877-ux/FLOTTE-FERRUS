@@ -1,23 +1,19 @@
 # CORPUS_STATE.md — Phylactere de Resurrection
 # FREGATE 02 : FERRUS CORPUS
-# Derniere mise a jour : 2026-04-18 (FONDATION — DECRET IMPERIAL EMIS)
+# Derniere mise a jour : 2026-04-26 (REFONTE — MISSION ALLÉGÉE)
 
 ---
 
-[STATUS] : PLANIFICATION — Phase 3 Bible Technique
+[STATUS] : REDEFINITION — Mission mise a jour, pret pour developpement
 
 [LAST_WORK] :
-- Decret Imperial emis : Fregate 02 FERRUS CORPUS creee
-- Brainstorming de fondation complete (nom, architecture, contrat IN/OUT valides)
-- Double sortie validee : .blend MASTER + .glb PREVIEW
-- Logique N personnages validee (glob ferrus_P*.fbx, traitement en boucle)
-- Structure dossiers creee sur GitHub
-- README.md redige et deploye
-- Fichiers docs/ initialises (STATE, PRD, ROADMAP, VALIDATION)
+- Refonte imperiale : Fregate 02 recentree sur la conversion FBX/GLB → .blend
+- Suppression de la logique d'injection d'animation (absorbee par ANIMUS)
+- Suppression du dossier IN_AVATAR/ (avatar_r15.blend n'est plus requis)
+- Renommage du script core : inject_animation.py → convert_to_blend.py
+- Mise a jour de tous les docs (PRD, ROADMAP, VALIDATION, README)
 
-[NEXT_TASK] : Rediger CORPUS_PRD.md complet + lancer Phase 5 Developpement (inject_animation.py + corpus_main.ipynb)
-
-[STATUS] : PRET_POUR_DEVELOPPEMENT — specs validees, architecture figee
+[NEXT_TASK] : Developper convert_to_blend.py + corpus_main.ipynb (Phase 5)
 
 [BLOCKERS] : Aucun
 
@@ -26,7 +22,6 @@
 [LINKS] :
 - Depot GitHub : https://github.com/kioka8877-ux/FLOTTE-FERRUS
 - Fregate amont : 01_FERRUS_ANIMUS/OUT/ferrus_P*.fbx
-- Avatar requis : avatar_r15.blend (fourni par l'utilisateur)
 
 ---
 
@@ -34,23 +29,22 @@
 
 | COMPARTIMENT | MODULE | STATUT |
 |---|---|---|
-| CORE | inject_animation.py | A DEVELOPPER |
+| CORE | convert_to_blend.py | A DEVELOPPER |
 | PIPELINE | corpus_main.ipynb | A DEVELOPPER |
-| DOCS | CORPUS_STATE.md | INITIALISE |
-| DOCS | CORPUS_PRD.md | A COMPLETER |
-| DOCS | CORPUS_ROADMAP.md | INITIALISE |
-| DOCS | CORPUS_VALIDATION.md | INITIALISE |
+| DOCS | CORPUS_STATE.md | MIS A JOUR |
+| DOCS | CORPUS_PRD.md | MIS A JOUR |
+| DOCS | CORPUS_ROADMAP.md | MIS A JOUR |
+| DOCS | CORPUS_VALIDATION.md | MIS A JOUR |
 
 ---
 
 ## Decisions Imperiales Actives
 
-- Fregate 02 est une fregate de LIAISON, pas de traitement lourd
-- Sortie double : .blend (MASTER pour EXODUS U01) + .glb (PREVIEW viewer)
-- Logique N+1 : glob automatique sur ferrus_P*.fbx, un seul avatar_r15.blend partage
-- Bones R15 Ferrus = Bones R15 Avatar Roblox → transfert direct, zero mapping
+- Fregate 02 est un convertisseur pur : FBX/GLB → .blend, rien de plus
+- IN_AVATAR/ supprime — aucun avatar externe requis
+- Script core renomme : convert_to_blend.py (logique Blender import → save)
+- Sortie unique : .blend MASTER (le .glb preview est supprime — ANIMUS peut le produire si besoin)
 - Stack : bpy uniquement, CPU, Colab gratuit, cout zero
-- Un seul script Blender headless (inject_animation.py), un notebook (corpus_main.ipynb)
 
 ---
 
@@ -60,3 +54,4 @@
 |---|---|
 | 2026-04-18 | Decret Imperial — creation Fregate 02 FERRUS CORPUS |
 | 2026-04-18 | Fondation : architecture, contrat, structure, docs initialises |
+| 2026-04-26 | Refonte imperiale — mission allégée, convertisseur pur FBX/GLB → .blend |
