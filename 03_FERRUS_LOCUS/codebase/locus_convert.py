@@ -81,21 +81,31 @@ def op_mesh_import(ply_path: str) -> bpy.types.Object:
     obj = bpy.context.selected_objects[0]
     bpy.context.view_layer.objects.active = obj
 
-    # Passer en mode edition pour le nettoyage
-    bpy.ops.object.mode_set(mode='EDIT')
-
-    # Supprimer les vertices isoles
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.delete_loose()
-
-    # Reparer les faces non-manifold (basique)
-    bpy.ops.mesh.select_non_manifold()
-    bpy.ops.mesh.fill_holes(sides=4)
-
-    bpy.ops.object.mode_set(mode='OBJECT')
-
     face_count = len(obj.data.polygons)
-    print(f"[LOCUS][MESH] Faces apres import: {face_count:,}")
+    vert_count = len(obj.data.vertices)
+    print(f"[LOCUS][MESH] Vertices: {vert_count:,} | Faces apres import: {face_count:,}")
+
+    # Si point cloud (0 faces) — reconstruction surface via Voxel Remesh
+    if face_count == 0 and vert_count > 0:
+        print("[LOCUS][MESH] Point cloud detecte — reconstruction surface (Voxel Remesh)...")
+        verts = [v.co for v in obj.data.vertices]
+        xs = [v[0] for v in verts]
+        ys = [v[1] for v in verts]
+        zs = [v[2] for v in verts]
+        extent = max(
+            max(xs) - min(xs),
+            max(ys) - min(ys),
+            max(zs) - min(zs),
+        )
+        voxel_size = max(0.005, min(0.05, extent / 200))
+        print(f"[LOCUS][MESH] Extent: {extent:.3f} | Voxel size: {voxel_size:.4f}")
+        mod = obj.modifiers.new(name="LOCUS_Remesh", type='REMESH')
+        mod.mode = 'VOXEL'
+        mod.voxel_size = voxel_size
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        face_count = len(obj.data.polygons)
+        print(f"[LOCUS][MESH] Faces apres remesh: {face_count:,}")
+
     return obj
 
 # =============================================================================
@@ -155,12 +165,23 @@ def op_bake_texture(obj: bpy.types.Object, img360_path: str, bake_res: int):
     wnt.links.new(env_node.outputs['Color'], bg_node.inputs['Color'])
     wnt.links.new(bg_node.outputs['Background'], out_node.inputs['Surface'])
 
-    # --- UV Map : Smart UV Project ---
+    # --- UV Map : projection spherique via bmesh (compatible headless) ---
+    import bmesh
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.02)
-    bpy.ops.object.mode_set(mode='OBJECT')
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    uv_layer = bm.loops.layers.uv.new("UVMap")
+    for face in bm.faces:
+        for loop in face.loops:
+            co = loop.vert.co.normalized()
+            u = 0.5 + math.atan2(co.x, co.y) / (2 * math.pi)
+            v = 0.5 - math.asin(max(-1.0, min(1.0, co.z))) / math.pi
+            loop[uv_layer].uv = (u, v)
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    print("[LOCUS][BAKE] UV spherique appliquee.")
 
     # --- Image cible pour baking ---
     bake_img = bpy.data.images.new("LOCUS_BakeTarget", width=bake_res, height=bake_res)
