@@ -1,22 +1,26 @@
 # ORBIS_STATE.md — Phylactere de Resurrection
 # FREGATE 05 : FERRUS ORBIS
-# Derniere mise a jour : 2026-04-26 (FONDATION — docs rediges)
+# Derniere mise a jour : 2026-04-30 (MODE STUDIO_OBJ — livraison)
 
 ---
 
-[STATUS] : FONDATION — Docs valides, code a ecrire
+[STATUS] : EN_DEVELOPPEMENT — Mode STUDIO_OBJ livre, validation en cours
 
 [LAST_WORK] :
-- Decision imperiale : creation Fregate 05 FERRUS ORBIS
-- Contexte : FERRUS LOCUS conserve sa mission PLY/360. ORBIS prend en charge l'extraction Roblox.
-- Brainstorming architectural complet execute (framework ATOM-IC applique)
-- Audit de reutilisation flotte execute : ~70% du code disponible en recyclage
-- Documents fondateurs rediges (STATE, PRD, ROADMAP, VALIDATION, README)
-- Structure dossiers creee : IN/ OUT/ codebase/ docs/
+- Decision imperiale : creation Fregate 05 FERRUS ORBIS (2026-04-26)
+- orbis_fetch.py livre : extraction HTTP API Roblox (mode METADATA)
+- orbis_core.py livre : pipeline Blender headless (mode METADATA)
+- orbis_main.ipynb livre : 7 cellules completes
+- Decision architecturale : ajout MODE STUDIO_OBJ (2026-04-30)
+  → Contexte : API Roblox assetdelivery retourne uniquement geometrie primitive
+  → Roblox Studio exporte la map complete avec interieurs + textures natives
+  → ORBIS reprend en aval : import → nettoyage → join → double face → GLB
+- orbis_core.py mis a jour : mode STUDIO_OBJ (--mode STUDIO_OBJ --input-file map.obj)
+- orbis_main.ipynb mis a jour : Cell 02 detection auto .obj/.fbx dans IN/, Cell 03 skip, Cell 04 branching
 
-[NEXT_TASK] : Ecrire orbis_core.py (Phase 1 — EXTRACTION + NETTOYAGE)
+[NEXT_TASK] : Validation imperiale mode STUDIO_OBJ sur une map Roblox Studio reelle
 
-[STATUS] : PRET_POUR_DEVELOPPEMENT
+[STATUS] : PRET_POUR_VALIDATION
 
 [BLOCKERS] : Aucun
 
@@ -33,16 +37,18 @@
 
 | COMPARTIMENT | MODULE | STATUT |
 |---|---|---|
-| EXTRACTION | orbis_fetch.py ou orbis_core.py | A ECRIRE |
-| NETTOYAGE | orbis_core.py — op_clean() | A ECRIRE |
-| PREPARATION | orbis_core.py — op_prepare() | A ECRIRE |
-| SEAL | orbis_core.py — op_seal_export() | A ECRIRE (recycle locus_convert.py) |
-| PIPELINE | orbis_main.ipynb | A ECRIRE |
-| DOCS | ORBIS_STATE.md | TERMINE |
+| EXTRACTION HTTP | orbis_fetch.py | LIVRE |
+| IMPORT STUDIO | orbis_core.py — op_import_studio_file() | LIVRE |
+| NETTOYAGE | orbis_core.py — op_clean_scene() | LIVRE |
+| JOIN + DOUBLE FACE | orbis_core.py — op_join_and_double_face() | LIVRE |
+| SEAL | orbis_core.py — op_seal_export() | LIVRE |
+| PIPELINE | orbis_main.ipynb | LIVRE |
+| DOCS | ORBIS_STATE.md | A JOUR |
 | DOCS | ORBIS_PRD.md | TERMINE |
 | DOCS | ORBIS_ROADMAP.md | TERMINE |
 | DOCS | ORBIS_VALIDATION.md | TERMINE |
 | INFRA | IN/ OUT/ | TERMINE |
+| VALIDATION | Test bout-en-bout STUDIO_OBJ | EN ATTENTE |
 
 ---
 
@@ -99,3 +105,6 @@
 | 2026-04-26 | Decision imperiale — creation Fregate 05 FERRUS ORBIS |
 | 2026-04-26 | Brainstorming ATOM-IC + audit reutilisation flotte |
 | 2026-04-26 | Fondation : docs rediges, structure deployee |
+| 2026-04-26 | orbis_fetch.py + orbis_core.py + orbis_main.ipynb livres (mode METADATA) |
+| 2026-04-30 | Decision : ajout mode STUDIO_OBJ — export Roblox Studio direct |
+| 2026-04-30 | orbis_core.py + orbis_main.ipynb mis a jour — mode STUDIO_OBJ operationnel |

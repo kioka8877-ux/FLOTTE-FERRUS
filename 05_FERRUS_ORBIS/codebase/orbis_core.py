@@ -1,17 +1,22 @@
 # =============================================================================
 # FERRUS ORBIS — orbis_core.py
-# Fregate 05 | Pipeline Blender headless : metadata JSON → GLB
+# Fregate 05 | Pipeline Blender headless : source → GLB
 # FLOTTE FERRUS | AD MAJOREM GLORIAM IMPERATORIS
 #
-# Ce script tourne en Blender headless (-b --python orbis_core.py -- [args]).
-# Il lit le metadata.json produit par orbis_fetch.py, reconstruit la geometrie
-# Roblox dans Blender, applique les textures, active le double face et exporte en GLB.
+# Deux modes :
 #
-# Usage :
-#   blender --background --python orbis_core.py -- \
-#     --metadata /tmp/orbis_cache/metadata.json \
-#     --asset-id 12345678 \
-#     --output   /content/drive/.../OUT/decor_12345678.glb
+#   MODE METADATA (API Roblox via orbis_fetch.py) :
+#     blender --background --python orbis_core.py -- \
+#       --mode METADATA \
+#       --metadata /tmp/orbis_cache/metadata.json \
+#       --asset-id 12345678 \
+#       --output   /content/drive/.../OUT/decor_12345678.glb
+#
+#   MODE STUDIO_OBJ (export direct Roblox Studio) :
+#     blender --background --python orbis_core.py -- \
+#       --mode STUDIO_OBJ \
+#       --input-file /content/drive/.../IN/map.obj \
+#       --output     /content/drive/.../OUT/decor_map.glb
 #
 # Recyclage flotte :
 #   - parse_args()        <- locus_convert.py:50
@@ -42,10 +47,19 @@ from pathlib import Path
 
 def parse_args():
     """Parse les arguments CLI Blender headless (apres --)."""
-    parser = argparse.ArgumentParser(description="FERRUS ORBIS — metadata → GLB")
-    parser.add_argument("--metadata",  required=True, help="Chemin vers metadata.json (orbis_fetch)")
-    parser.add_argument("--asset-id",  required=True, help="Asset ID Roblox (pour nommage rapport)")
-    parser.add_argument("--output",    required=True, help="Chemin de sortie .glb")
+    parser = argparse.ArgumentParser(description="FERRUS ORBIS — source → GLB")
+    parser.add_argument("--mode",       required=True,
+                        choices=["METADATA", "STUDIO_OBJ"],
+                        help="Mode pipeline : METADATA (API Roblox) ou STUDIO_OBJ (export Studio)")
+    parser.add_argument("--output",     required=True, help="Chemin de sortie .glb")
+
+    # Mode METADATA
+    parser.add_argument("--metadata",   help="[METADATA] Chemin vers metadata.json (orbis_fetch)")
+    parser.add_argument("--asset-id",   help="[METADATA] Asset ID Roblox (pour nommage rapport)")
+
+    # Mode STUDIO_OBJ
+    parser.add_argument("--input-file", help="[STUDIO_OBJ] Chemin vers .obj ou .fbx exporte depuis Studio")
+
     # Blender injecte ses propres args avant "--", on ignore tout avant
     argv = sys.argv
     if "--" in argv:
@@ -65,10 +79,42 @@ def op_scene_init():
     print("[ORBIS][CORE] Scene vide OK.")
 
 # =============================================================================
-# OP 2 — RECONSTRUCTION GEOMETRIE depuis metadata
+# OP 2A — IMPORT STUDIO FILE (mode STUDIO_OBJ)
 # =============================================================================
 
-def op_build_geometry(parts: list[dict]) -> list:
+def op_import_studio_file(input_file: str) -> int:
+    """
+    Importe un fichier .obj ou .fbx exporte depuis Roblox Studio.
+    Retourne le nombre d'objets MESH importes.
+    """
+    ext = Path(input_file).suffix.lower()
+    print(f"[ORBIS][CORE] Import fichier Studio : {input_file} (format: {ext})")
+
+    objects_before = set(bpy.context.scene.objects)
+
+    if ext == ".obj":
+        bpy.ops.wm.obj_import(filepath=input_file)
+    elif ext in (".fbx",):
+        bpy.ops.import_scene.fbx(filepath=input_file)
+    else:
+        raise ValueError(f"Format non supporte : {ext}. Utiliser .obj ou .fbx depuis Roblox Studio.")
+
+    objects_after  = set(bpy.context.scene.objects)
+    new_objects    = objects_after - objects_before
+    mesh_count     = sum(1 for o in new_objects if o.type == 'MESH')
+
+    print(f"[ORBIS][CORE] Import OK : {len(new_objects)} objets ({mesh_count} MESH)")
+
+    if mesh_count == 0:
+        raise RuntimeError("Aucun objet MESH importe — verifier le fichier d'entree")
+
+    return mesh_count
+
+# =============================================================================
+# OP 2B — RECONSTRUCTION GEOMETRIE depuis metadata (mode METADATA)
+# =============================================================================
+
+def op_build_geometry(parts: list) -> list:
     """
     Reconstruit la geometrie Roblox dans Blender depuis la liste des parts.
     - Part / WedgePart / CornerWedgePart → primitives bpy
@@ -173,10 +219,10 @@ def _assign_color_material(obj, color: list, name: str):
     obj.data.materials.append(mat)
 
 # =============================================================================
-# OP 3 — APPLICATION TEXTURES
+# OP 3 — APPLICATION TEXTURES (mode METADATA uniquement)
 # =============================================================================
 
-def op_apply_textures(parts: list[dict], tex_map_abs: dict[str, str]):
+def op_apply_textures(parts: list, tex_map_abs: dict):
     """
     Remplace les materiaux couleur par des materiaux texture pour les parts
     qui ont des textures resolues. Recycle le node graph de locus_convert.py:198.
@@ -374,71 +420,118 @@ def write_rapport(output_path: str, rapport: dict):
 
 def main():
     args = parse_args()
-
-    metadata_path = args.metadata
-    asset_id      = args.asset_id
-    output_path   = args.output
-
-    # Validations input
-    if not os.path.exists(metadata_path):
-        raise FileNotFoundError(f"metadata.json introuvable : {metadata_path}")
-
-    with open(metadata_path, "r", encoding="utf-8") as f:
-        meta = json.load(f)
-
-    parts = meta.get("parts", [])
-    if not parts:
-        raise ValueError("metadata.json ne contient aucune part — orbis_fetch a echoue ?")
-
-    # Reconstruire les chemins absolus des textures
-    meta_dir    = os.path.dirname(metadata_path)
-    tex_map_rel = meta.get("textures", {}).get("map", {})
-    tex_map_abs = {
-        tid: os.path.join(meta_dir, rel_path)
-        for tid, rel_path in tex_map_rel.items()
-    }
+    mode        = args.mode
+    output_path = args.output
 
     rapport = {
         "status":      "RUNNING",
-        "asset_id":    asset_id,
-        "format":      meta.get("format", "?"),
+        "mode":        mode,
         "output_glb":  output_path,
-        "textures": {
-            "total":   meta.get("textures", {}).get("total", 0),
-            "resolues": meta.get("textures", {}).get("resolues", 0),
-            "privees": meta.get("textures", {}).get("privees", 0),
-        },
-        "mesh": {},
+        "mesh":        {},
         "double_face": True,
-        "warnings":    meta.get("warnings", []),
+        "warnings":    [],
     }
 
     try:
-        # OP 1 — SCENE INIT
-        op_scene_init()
+        # ── MODE STUDIO_OBJ ──────────────────────────────────────────────
+        if mode == "STUDIO_OBJ":
+            if not args.input_file:
+                raise ValueError("--input-file requis en mode STUDIO_OBJ")
 
-        # OP 2 — RECONSTRUCTION GEOMETRIE
-        created = op_build_geometry(parts)
-        rapport["mesh"]["parts_roblox"] = len(parts)
-        rapport["mesh"]["objects_crees"] = len(created)
+            input_file = args.input_file
+            if not os.path.exists(input_file):
+                raise FileNotFoundError(f"Fichier introuvable : {input_file}")
 
-        # OP 3 — APPLICATION TEXTURES
-        op_apply_textures(parts, tex_map_abs)
+            rapport["input_file"] = input_file
+            rapport["source"]     = Path(input_file).name
 
-        # OP 4 — NETTOYAGE
-        removed = op_clean_scene()
-        rapport["mesh"]["objects_supprimes"] = removed
+            # OP 1 — SCENE INIT
+            op_scene_init()
 
-        # OP 5 — JOIN + DOUBLE FACE
-        merged = op_join_and_double_face()
-        rapport["mesh"]["vertices"]    = len(merged.data.vertices)
-        rapport["mesh"]["faces"]       = len(merged.data.polygons)
-        rapport["mesh"]["mesh_unifie"] = True
+            # OP 2A — IMPORT STUDIO FILE
+            mesh_count = op_import_studio_file(input_file)
+            rapport["mesh"]["objects_importes"] = mesh_count
 
-        # OP 6 — SEAL
-        size_mb = op_seal_export(merged, output_path)
-        rapport["output_size_mb"] = round(size_mb, 2)
-        rapport["status"] = "SUCCESS"
+            # OP 4 — NETTOYAGE (cameras, lights, orphans)
+            removed = op_clean_scene()
+            rapport["mesh"]["objects_supprimes"] = removed
+
+            # OP 5 — JOIN + DOUBLE FACE
+            merged = op_join_and_double_face()
+            rapport["mesh"]["vertices"]    = len(merged.data.vertices)
+            rapport["mesh"]["faces"]       = len(merged.data.polygons)
+            rapport["mesh"]["mesh_unifie"] = True
+
+            # OP 6 — SEAL
+            size_mb = op_seal_export(merged, output_path)
+            rapport["output_size_mb"] = round(size_mb, 2)
+            rapport["status"] = "SUCCESS"
+
+            label = Path(input_file).stem
+
+        # ── MODE METADATA (API Roblox) ───────────────────────────────────
+        elif mode == "METADATA":
+            if not args.metadata:
+                raise ValueError("--metadata requis en mode METADATA")
+            if not args.asset_id:
+                raise ValueError("--asset-id requis en mode METADATA")
+
+            metadata_path = args.metadata
+            asset_id      = args.asset_id
+
+            if not os.path.exists(metadata_path):
+                raise FileNotFoundError(f"metadata.json introuvable : {metadata_path}")
+
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+
+            parts = meta.get("parts", [])
+            if not parts:
+                raise ValueError("metadata.json ne contient aucune part — orbis_fetch a echoue ?")
+
+            meta_dir    = os.path.dirname(metadata_path)
+            tex_map_rel = meta.get("textures", {}).get("map", {})
+            tex_map_abs = {
+                tid: os.path.join(meta_dir, rel_path)
+                for tid, rel_path in tex_map_rel.items()
+            }
+
+            rapport["asset_id"]  = asset_id
+            rapport["format"]    = meta.get("format", "?")
+            rapport["textures"]  = {
+                "total":   meta.get("textures", {}).get("total", 0),
+                "resolues": meta.get("textures", {}).get("resolues", 0),
+                "privees": meta.get("textures", {}).get("privees", 0),
+            }
+            rapport["warnings"] = meta.get("warnings", [])
+
+            # OP 1 — SCENE INIT
+            op_scene_init()
+
+            # OP 2B — RECONSTRUCTION GEOMETRIE
+            created = op_build_geometry(parts)
+            rapport["mesh"]["parts_roblox"]   = len(parts)
+            rapport["mesh"]["objects_crees"]  = len(created)
+
+            # OP 3 — APPLICATION TEXTURES
+            op_apply_textures(parts, tex_map_abs)
+
+            # OP 4 — NETTOYAGE
+            removed = op_clean_scene()
+            rapport["mesh"]["objects_supprimes"] = removed
+
+            # OP 5 — JOIN + DOUBLE FACE
+            merged = op_join_and_double_face()
+            rapport["mesh"]["vertices"]    = len(merged.data.vertices)
+            rapport["mesh"]["faces"]       = len(merged.data.polygons)
+            rapport["mesh"]["mesh_unifie"] = True
+
+            # OP 6 — SEAL
+            size_mb = op_seal_export(merged, output_path)
+            rapport["output_size_mb"] = round(size_mb, 2)
+            rapport["status"] = "SUCCESS"
+
+            label = f"Asset {asset_id}"
 
     except Exception as e:
         rapport["status"] = "ERROR"
@@ -453,8 +546,8 @@ def main():
 
     print()
     print("[ORBIS][CORE] ══════════════════════════════════════")
-    print(f"[ORBIS][CORE] PIPELINE COMPLET — Asset {asset_id}")
-    print(f"[ORBIS][CORE]   Parts    : {rapport['mesh'].get('parts_roblox', '?')}")
+    print(f"[ORBIS][CORE] PIPELINE COMPLET — {label}")
+    print(f"[ORBIS][CORE]   Mode     : {mode}")
     print(f"[ORBIS][CORE]   Vertices : {rapport['mesh'].get('vertices', '?'):,}" if isinstance(rapport['mesh'].get('vertices'), int) else f"[ORBIS][CORE]   Vertices : ?")
     print(f"[ORBIS][CORE]   Faces    : {rapport['mesh'].get('faces', '?'):,}" if isinstance(rapport['mesh'].get('faces'), int) else f"[ORBIS][CORE]   Faces    : ?")
     print(f"[ORBIS][CORE]   GLB      : {rapport.get('output_size_mb', '?')} Mo")
