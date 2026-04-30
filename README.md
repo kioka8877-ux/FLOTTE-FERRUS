@@ -54,7 +54,7 @@ Cinq phases sacrees. Le developpement ne commence qu'a la Phase 5.
 | 02 | FERRUS CORPUS | OPERATIONNELLE - Validation imperiale 2026-04-26 |
 | 03 | FERRUS LOCUS | EN ATTENTE DE DECRET IMPERIAL |
 | 04 | FERRUS OSSEUS | OPERATIONNELLE - Validation imperiale 2026-04-24 |
-| 05 | FERRUS ORBIS | EN DEVELOPPEMENT - Fondation 2026-04-26 |
+| 05 | FERRUS ORBIS | OPERATIONNELLE - Validation imperiale 2026-04-30 |
 
 ---
 

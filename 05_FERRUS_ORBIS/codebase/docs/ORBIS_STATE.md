@@ -1,10 +1,10 @@
 # ORBIS_STATE.md — Phylactere de Resurrection
 # FREGATE 05 : FERRUS ORBIS
-# Derniere mise a jour : 2026-04-30 (MODE STUDIO_OBJ — livraison)
+# Derniere mise a jour : 2026-04-30 (VALIDATION IMPERIALE MODE STUDIO_OBJ)
 
 ---
 
-[STATUS] : EN_DEVELOPPEMENT — Mode STUDIO_OBJ livre, validation en cours
+[STATUS] : OPERATIONNELLE — Validation imperiale 2026-04-30
 
 [LAST_WORK] :
 - Decision imperiale : creation Fregate 05 FERRUS ORBIS (2026-04-26)
@@ -15,12 +15,18 @@
   → Contexte : API Roblox assetdelivery retourne uniquement geometrie primitive
   → Roblox Studio exporte la map complete avec interieurs + textures natives
   → ORBIS reprend en aval : import → nettoyage → join → double face → GLB
-- orbis_core.py mis a jour : mode STUDIO_OBJ (--mode STUDIO_OBJ --input-file map.obj)
-- orbis_main.ipynb mis a jour : Cell 02 detection auto .obj/.fbx dans IN/, Cell 03 skip, Cell 04 branching
+- orbis_core.py mis a jour : mode STUDIO_OBJ + support .glb/.gltf/.obj/.fbx
+- orbis_main.ipynb mis a jour : Cell 02 detection auto .glb/.obj/.fbx dans IN/, Cell 03 skip, Cell 04 branching
+- VALIDATION IMPERIALE mode STUDIO_OBJ (2026-04-30) :
+  → map.glb importe : 604 objets, 174 mesh
+  → Mesh unifie : 258,064 vertices | 397,110 faces
+  → 41 materiaux double face
+  → GLB produit : 16.47 Mo en 4.1 secondes
+  → Pipeline complet bout-en-bout confirme
 
-[NEXT_TASK] : Validation imperiale mode STUDIO_OBJ sur une map Roblox Studio reelle
+[NEXT_TASK] : Aucun — Fregate operationnelle
 
-[STATUS] : PRET_POUR_VALIDATION
+[STATUS] : OPERATIONNELLE
 
 [BLOCKERS] : Aucun
 
@@ -48,7 +54,7 @@
 | DOCS | ORBIS_ROADMAP.md | TERMINE |
 | DOCS | ORBIS_VALIDATION.md | TERMINE |
 | INFRA | IN/ OUT/ | TERMINE |
-| VALIDATION | Test bout-en-bout STUDIO_OBJ | EN ATTENTE |
+| VALIDATION | Test bout-en-bout STUDIO_OBJ | VALIDE 2026-04-30 |
 
 ---
 
@@ -82,19 +88,19 @@
 
 | BLOC | SOURCE | STATUT |
 |---|---|---|
-| parse_args() CLI headless | locus_convert.py:50 | A RECYCLER |
-| wm.read_factory_settings(use_empty=True) | Toutes fregates | A RECYCLER |
-| mat.use_backface_culling = False + node graph | locus_convert.py:194 | A RECYCLER |
-| op_seal_export() — flags GLB | locus_convert.py:222 | A RECYCLER |
-| write_rapport() + main() try/finally | locus_convert.py:250 | A RECYCLER |
-| CAMERA/LIGHT removal loop | forge_convert.py:132 | A RECYCLER |
-| orphans_purge(do_recursive=True) | forge_convert.py:137 | A RECYCLER |
-| join_meshes() select+join+apply | osseus_core.py:130 | A RECYCLER |
-| warnings = [] accumulation | forge_convert.py:91 | A RECYCLER |
-| Cell 00 Git Sync | corpus_main.ipynb | A RECYCLER |
-| Cell 01 Blender install | locus_main.ipynb | A RECYCLER |
-| Cell 04 subprocess launch | locus_main.ipynb | A RECYCLER |
-| Cell 05 Rapport + validation | locus_main.ipynb | A RECYCLER |
+| parse_args() CLI headless | locus_convert.py:50 | RECYCLE |
+| wm.read_factory_settings(use_empty=True) | Toutes fregates | RECYCLE |
+| mat.use_backface_culling = False + node graph | locus_convert.py:194 | RECYCLE |
+| op_seal_export() — flags GLB | locus_convert.py:222 | RECYCLE |
+| write_rapport() + main() try/finally | locus_convert.py:250 | RECYCLE |
+| CAMERA/LIGHT removal loop | forge_convert.py:132 | RECYCLE |
+| orphans_purge(do_recursive=True) | forge_convert.py:137 | RECYCLE |
+| join_meshes() select+join+apply | osseus_core.py:130 | RECYCLE |
+| warnings = [] accumulation | forge_convert.py:91 | RECYCLE |
+| Cell 00 Git Sync | corpus_main.ipynb | RECYCLE |
+| Cell 01 Blender install | locus_main.ipynb | RECYCLE |
+| Cell 04 subprocess launch | locus_main.ipynb | RECYCLE |
+| Cell 05 Rapport + validation | locus_main.ipynb | RECYCLE |
 
 ---
 
@@ -108,3 +114,4 @@
 | 2026-04-26 | orbis_fetch.py + orbis_core.py + orbis_main.ipynb livres (mode METADATA) |
 | 2026-04-30 | Decision : ajout mode STUDIO_OBJ — export Roblox Studio direct |
 | 2026-04-30 | orbis_core.py + orbis_main.ipynb mis a jour — mode STUDIO_OBJ operationnel |
+| 2026-04-30 | VALIDATION IMPERIALE — mode STUDIO_OBJ : map.glb → decor_map.glb (16.47 Mo, 4.1s) |
