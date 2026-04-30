@@ -94,10 +94,12 @@ def op_import_studio_file(input_file: str) -> int:
 
     if ext == ".obj":
         bpy.ops.wm.obj_import(filepath=input_file)
-    elif ext in (".fbx",):
+    elif ext == ".fbx":
         bpy.ops.import_scene.fbx(filepath=input_file)
+    elif ext == ".glb" or ext == ".gltf":
+        bpy.ops.import_scene.gltf(filepath=input_file)
     else:
-        raise ValueError(f"Format non supporte : {ext}. Utiliser .obj ou .fbx depuis Roblox Studio.")
+        raise ValueError(f"Format non supporte : {ext}. Utiliser .glb, .obj ou .fbx depuis Roblox Studio.")
 
     objects_after  = set(bpy.context.scene.objects)
     new_objects    = objects_after - objects_before
